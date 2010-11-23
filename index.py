@@ -35,21 +35,7 @@ class KVIndex(object):
     
     def __len__(self):
         return 42 
-
-#helpers        
-    def triple_to_key(self, (s,p,o)): 
-        '''return a 60 byte string
-
-        >>> triple_to_key((33,44,55)) 
-        bytearray(b'000000000000000000330000000000000000004400000000000000000055')
-        '''
-        #todo optimize
-        return self.id_to_key(s) + self.id_to_key(p) + self.id_to_key(o)        
-
-    def id_to_key(self,id):
-        if id == None:
-            return None 
-        return '%0*d' % (20, id)        
+      
                            
 
 import redis        
@@ -83,46 +69,45 @@ class KVIndexRedis(KVIndex):
     
     def add_triple(self, triple):
         #print "inserting %s %s %s" % triple
-        s,p,o = triple 
-        sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
+        sid,pid,oid = triple 
         #todo check duplicates 
         
-        self.levels[0].sadd("%s:%s" % (self.key_prefix, sid), pid)
+        self.levels[0].sadd(":".join( [ self.key_prefix, sid]), pid)
         #add oid to level2 set: eg for (22,33,44) the key is spo:l1:33:44
-        self.levels[1].sadd("%s:%s:%s" % (self.key_prefix, sid, pid), oid) 
+        self.levels[1].sadd(":".join( [ self.key_prefix, sid,pid]), oid) 
       
     def __len__(self):
         return self.levels[1].dbsize() 
         
         
     def count(self, triple):
-        (s,p,o) = triple
-        sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
+        sid,pid,oid = triple
+        
         
         if (sid,pid,oid) == (None,None,None):
             return len(self)
         # (?x, ?y, None)
         if sid is not None and pid is not None and oid is None:
-            return self.levels[1].scard("%s:%s:%s" % (self.key_prefix, sid, pid) )
+            return self.levels[1].scard( ":".join( [ self.key_prefix, sid,pid]) ) #key is "prefix:sid:pid"
         # (?x, None, None)             
-        elif s is not None and p is None and o is None:
-            return self.levels[0].scard("%s:%s" % (self.key_prefix, sid) )
+        elif sid is not None and pid is None and oid is None:
+            return self.levels[0].scard( ":".join( [ self.key_prefix, sid]) )
         else:
             raise NotImplementedError("you tried to count something weird")   
 
     #generator for ids, bad implementation 
     def ids_for_triple(self,triple):
-        s,p,o = triple
-        sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
+        sid,pid,oid = triple
+       
         # (?x, ?y, None)
         if sid is not None and pid is not None and oid is None:
-            for key in self.levels[1].smembers("%s:%s:%s" % (self.key_prefix, sid, pid)):
+            for key in self.levels[1].smembers( ":".join( [ self.key_prefix, sid,pid])):
                 yield key
         # (?x, None, None)
         elif sid is not None and pid is None and oid is None:
             #get all pid's
-            for pid in self.levels[0].smembers("%s:%s" % (self.key_prefix, sid)):
-                for oid in self.levels[1].smembers("%s:%s:%s" % (self.key_prefix, sid, pid)):
+            for pid in self.levels[0].smembers( ":".join( [ self.key_prefix, sid])):
+                for oid in self.levels[1].smembers( ":".join( [ self.key_prefix, sid,pid])):
                     yield oid 
         else:
             raise NotImplementedError("")
@@ -178,28 +163,28 @@ class KVIndexTC(KVIndex):
         
     def add_triple(self, triple):
         #print "inserting %s %s %s" % triple
-        s,p,o = triple
+        sid,pid,oid = triple
         #todo check duplicates 
-        self.levels[0].addint(self.id_to_key(s), 1) 
-        self.levels[1].addint(self.id_to_key(s) + self.id_to_key(p), 1)
-        self.levels[2].put(self.triple_to_key(triple), "") 
+        self.levels[0].addint(sid, 1) 
+        self.levels[1].addint("".join([sid,pid]), 1)
+        self.levels[2].put("".join(triple), "") 
           
         
     def __len__(self):
         return len(self.levels[2]) 
         
     def count(self, triple):
-        (s,p,o) = triple
-        if (s,p,o) == (None,None,None):
+        sid,pid,oid = triple
+        if (sid,pid,oid) == (None,None,None):
             return len(self)
-        if s is not None and p is not None and o is None:
+        if sid is not None and pid is not None and oid is None:
             if self.shared: #todo decorator
                 #get keys from level1 and then search level2
                 raise NotImplementedError("")
             else:
-                return self.levels[1].addint(self.id_to_key(s) + self.id_to_key(p), 0)             
-        elif s is not None and p is None and o is None:
-            return self.levels[0].addint(self.id_to_key(s), 0)
+                return self.levels[1].addint( "".join([sid,pid]) , 0)             
+        elif sid is not None and pid is None and oid is None:
+            return self.levels[0].addint(sid, 0)
         else:
             raise NotImplementedError("you tried to count something weird")    
              
@@ -208,13 +193,13 @@ class KVIndexTC(KVIndex):
                 
                           
     def ids_for_triple(self,triple):
-        s,p,o = triple
-        if s is not None and p is not None and o is None:
-            searchstring = self.id_to_key(s) + self.id_to_key(p)               
+        sid,pid,oid = triple
+        if sid is not None and pid is not None and oid is None:
+            searchstring = "".join([sid,pid])               
             return self.generator_for_searchstring(searchstring)
             #search in level2
-        elif s is not None and p is None and o is None:
-            searchstring = self.id_to_key(s)
+        elif sid is not None and pid is None and oid is None:
+            searchstring = sid
             
             if self.shared:
                 #get keys from level1 and then search level2

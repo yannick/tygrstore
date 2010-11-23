@@ -25,11 +25,11 @@ class Test_Tygrstore(object):
         spo_index = self.spo_index
 
 #inserting mock data
-        mocks = [(1,2,3),
-                  (1,2,33),
-                  (1,4,3),
-                  (1,6,3),
-                  (10,6,3) 
+        mocks = [("01","02","03"),
+                  ("01","02","33"),
+                  ("01","04","03"),
+                  ("01","06","03"),
+                  ("10","06","03") 
                   ]
         for mock in mocks:
             spo_index.add_triple(mock)
@@ -39,10 +39,10 @@ class Test_Tygrstore(object):
         
      
 #selectivity 
-        assert(spo_index.count( (1,None,None)) == 3, " counting is faulty")
-        assert(spo_index.count( (1,2,None)) == 2, " counting is faulty")
-        assert(spo_index.count( (10,None,None)) == 1, " counting is faulty")
-        assert(spo_index.count( (None,None,None)) == 5, "global counting is faulty") 
+        assert(spo_index.count( ("01",None,None)) == "03", " counting is faulty")
+        assert(spo_index.count( ("01","02",None)) == "02", " counting is faulty")
+        assert(spo_index.count( ("10",None,None)) == "01", " counting is faulty")
+        assert(spo_index.count( (None,None,None)) == "05", "global counting is faulty") 
 
 #count not in index, what should happen here?        
         #spo_index.count( (None,None,33) )
@@ -50,7 +50,7 @@ class Test_Tygrstore(object):
         
 #key reading
         l1 = []
-        for key in spo_index.ids_for_triple( (1,2,None) ):
+        for key in spo_index.ids_for_triple( ("01","02",None) ):
             l1.append(key)
         assert(len(l1) == 2)
 # test for s only
