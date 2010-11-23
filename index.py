@@ -109,7 +109,8 @@ class KVIndexRedis(KVIndex):
             return self.levels[0].scard("%s:%s" % (self.key_prefix, sid) )
         else:
             raise NotImplementedError("you tried to count something weird")   
-            
+
+    #generator for ids, bad implementation 
     def ids_for_triple(self,triple):
         s,p,o = triple
         sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
