@@ -35,39 +35,111 @@ class KVIndex(object):
     
     def __len__(self):
         return 42 
-        
-   
+
+#helpers        
+    def triple_to_key(self, (s,p,o)): 
+        '''return a 60 byte string
+
+        >>> triple_to_key((33,44,55)) 
+        bytearray(b'000000000000000000330000000000000000004400000000000000000055')
+        '''
+        #todo optimize
+        return self.id_to_key(s) + self.id_to_key(p) + self.id_to_key(o)        
+
+    def id_to_key(self,id):
+        if id == None:
+            return None 
+        return '%0*d' % (20, id)        
+                           
 
 import redis        
 class KVIndexRedis(KVIndex):
-    def __init__(object, redis, name="spo"):
-        pass
+    def __init__(self, name="spo", host='localhost', port=6379, path=""):
+        self.is_open = INDEX_CLOSED
 
+        self.host = host
+        self.port = port
+        
+#        self.triple_indexes = {"s" : 0, "p" : 1, "o" : 2}
 
-    def get(self):
-        pass
+        self.shared = False         
+        self.levels = [] #todo use list
+        self.name = name
+        self.key_prefix = name
+        self.open()
+        
+    def delete(self):
+        for r in self.levels:
+            r.flushdb()
+            
 
-    def create(self):
-        pass
-
-    def open(self):
-        pass
+    def open(self):        
+        self.levels.append(redis.Redis(self.host, self.port, db=10) )
+        self.levels.append(redis.Redis(self.host, self.port, db=11) )
+        self.is_open = INDEX_OPEN    
 
     def close(self):
         pass
-
-   
+    
+    def add_triple(self, triple):
+        #print "inserting %s %s %s" % triple
+        s,p,o = triple 
+        sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
+        #todo check duplicates 
+        
+        self.levels[0].sadd("%s:%s" % (self.key_prefix, sid), pid)
+        #add oid to level2 set: eg for (22,33,44) the key is spo:l1:33:44
+        self.levels[1].sadd("%s:%s:%s" % (self.key_prefix, sid, pid), oid) 
+      
+    def __len__(self):
+        return self.levels[1].dbsize() 
+        
+        
+    def count(self, triple):
+        (s,p,o) = triple
+        sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
+        
+        if (sid,pid,oid) == (None,None,None):
+            return len(self)
+        # (?x, ?y, None)
+        if sid is not None and pid is not None and oid is None:
+            return self.levels[1].scard("%s:%s:%s" % (self.key_prefix, sid, pid) )
+        # (?x, None, None)             
+        elif s is not None and p is None and o is None:
+            return self.levels[0].scard("%s:%s" % (self.key_prefix, sid) )
+        else:
+            raise NotImplementedError("you tried to count something weird")   
+            
+    def ids_for_triple(self,triple):
+        s,p,o = triple
+        sid,pid,oid = self.id_to_key(s),self.id_to_key(p),self.id_to_key(o)
+        # (?x, ?y, None)
+        if sid is not None and pid is not None and oid is None:
+            for key in self.levels[1].smembers("%s:%s:%s" % (self.key_prefix, sid, pid)):
+                yield key
+        # (?x, None, None)
+        elif sid is not None and pid is None and oid is None:
+            #get all pid's
+            for pid in self.levels[0].smembers("%s:%s" % (self.key_prefix, sid)):
+                for oid in self.levels[1].smembers("%s:%s:%s" % (self.key_prefix, sid, pid)):
+                    yield oid 
+        else:
+            raise NotImplementedError("")
+                    
+                                
 import os                         
+#import shutil #deleting
 from tc import *
 '''represents a spo-type index'''
+
 class KVIndexTC(KVIndex):
     def __init__(self, name="spo", path="." ):
         self.path = os.path.abspath(path)
         self.is_open = INDEX_CLOSED
-        self.levels = []
+        self.levels = [] #todo use list
         self.name = name
         self.filename_prefix = name
-        is_open = self.open()
+        self.is_open = self.open()
         self.shared = False
      
 # tygrstore api methods
@@ -75,11 +147,12 @@ class KVIndexTC(KVIndex):
         if self.is_open == INDEX_OPEN:
             return INDEX_OPEN
         for i in range(0,3):
-             bdb = BDB()              
+             bdb = BDB() 
+             #tuning?             
              fullpath = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
              #print fullpath
              bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT)
-             self.levels.append(bdb)  
+             self.levels.append(bdb)          
         self.is_open = INDEX_OPEN
         return self.is_open  
 
@@ -98,36 +171,36 @@ class KVIndexTC(KVIndex):
         close = self.close()
         for i in range(0,3):
             filen = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
-            #unlink/delete not working, why???
+            #unlink/delete not working, why??? 
             os.unlink( filen )
             
         
     def add_triple(self, triple):
         #print "inserting %s %s %s" % triple
         s,p,o = triple
-  
+        #todo check duplicates 
         self.levels[0].addint(self.id_to_key(s), 1) 
         self.levels[1].addint(self.id_to_key(s) + self.id_to_key(p), 1)
         self.levels[2].put(self.triple_to_key(triple), "") 
           
         
     def __len__(self):
-        return len(self.levels[2].keys()) 
+        return len(self.levels[2]) 
         
     def count(self, triple):
         (s,p,o) = triple
         if (s,p,o) == (None,None,None):
             return len(self)
         if s is not None and p is not None and o is None:
-            if self.shared:
+            if self.shared: #todo decorator
                 #get keys from level1 and then search level2
-                raise NotImplemented("")
+                raise NotImplementedError("")
             else:
                 return self.levels[1].addint(self.id_to_key(s) + self.id_to_key(p), 0)             
         elif s is not None and p is None and o is None:
             return self.levels[0].addint(self.id_to_key(s), 0)
         else:
-            raise NotImplemented("you tried to count something weird")    
+            raise NotImplementedError("you tried to count something weird")    
              
 
                 
@@ -161,6 +234,7 @@ class KVIndexTC(KVIndex):
         #while 1, WTF???   
         while 1:
             next = cur.next() #why cant that be in the while clause... 
+            # todo: speedup
             if next.startswith(searchstring):
                 yield next
             else: 
@@ -187,18 +261,7 @@ class KVIndexTC(KVIndex):
         yield list_of_ids   
                                     
         
-#helpers        
-    def triple_to_key(self, (s,p,o)): 
-        '''return a 60 byte string
-
-        >>> triple_to_key((33,44,55)) 
-        bytearray(b'000000000000000000330000000000000000004400000000000000000055')
-        '''
-        #todo optimize
-        return self.id_to_key(s) + self.id_to_key(p) + self.id_to_key(o)        
-    
-    def id_to_key(self,id): 
-        return '%0*d' % (20, id)   
+   
                                            
     
                            

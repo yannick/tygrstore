@@ -7,7 +7,7 @@ class Test_Tygrstore(object):
 
     def setUp(self):
         self.spo_index_filename = "test_index.bdb"
-        self.spo_index = KVIndexTC(name="spo", path=".")
+        self.spo_index = KVIndexRedis(name="spo", path=".")
         status = self.spo_index.is_open
         assert(status == INDEX_OPEN, "could not open index")
         assert(self.spo_index.name == "spo")
@@ -53,6 +53,8 @@ class Test_Tygrstore(object):
         for key in spo_index.ids_for_triple( (1,2,None) ):
             l1.append(key)
         assert(len(l1) == 2)
+# test for s only
+
 
 #triple which the index is not optimized for
 #what should happen here?        
