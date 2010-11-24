@@ -3,51 +3,17 @@ INDEX_CLOSED = 666
 class KVIndex(object):
 
  
-    def __init__(object):
-        pass
-        
-    #type of id
-
-    #count_of_all records
-
-    #generator for list of id's
-
-    #curser from an index given the prefix,
-
-    #            
-    def get(self):
-        pass
-    
-    def create(self):
-        pass
-   
-    def open(self):
-        pass
-     
-    def close(self):
-        pass
-
-    def count(self, triple):
-        pass
-    
-    def delete(self):
-        "harakiri"
-    
-    def __len__(self):
-        return 42 
-      
-                           
+    def __init__(self, keylength=20):
+        self.keylength = keylength
+                       
 
 import redis        
 class KVIndexRedis(KVIndex):
-    def __init__(self, name="spo", host='localhost', port=6379, path=""):
+    def __init__(self, name="spo", host='localhost', port=6379, path="", keylength=20):
         self.is_open = INDEX_CLOSED
-
+        super(KVIndexRedis, self).__init__(keylength=keylength) 
         self.host = host
         self.port = port
-        
-#        self.triple_indexes = {"s" : 0, "p" : 1, "o" : 2}
-
         self.shared = False         
         self.levels = [] #todo use list
         self.name = name
@@ -68,22 +34,28 @@ class KVIndexRedis(KVIndex):
         pass
     
     def add_triple(self, triple):
-        #print "inserting %s %s %s" % triple
-        sid,pid,oid = triple 
-        #todo check duplicates 
+        '''adds a triple. 
         
+        with redis its not necessary to check for duplicates since that is done automatically
+        '''
+        sid,pid,oid = triple 
+        
+        #add the pid to the level0 set
         self.levels[0].sadd(":".join( [ self.key_prefix, sid]), pid)
-        #add oid to level2 set: eg for (22,33,44) the key is spo:l1:33:44
+        
+        # : is a convention in redisworld 
+        #add oid to level1 set: eg for (22,33,44) the key is spo:l1:33:44
         self.levels[1].sadd(":".join( [ self.key_prefix, sid,pid]), oid) 
       
     def __len__(self):
+        #we can use dbsize since we use a different db for each index.
+        #otherwise we would need to keep track of the count
         return self.levels[1].dbsize() 
         
         
     def count(self, triple):
         sid,pid,oid = triple
-        
-        
+
         if (sid,pid,oid) == (None,None,None):
             return len(self)
         # (?x, ?y, None)
@@ -95,7 +67,9 @@ class KVIndexRedis(KVIndex):
         else:
             raise NotImplementedError("you tried to count something weird")   
 
-    #generator for ids, bad implementation 
+    #generator for ids
+    #this implementation will not scale well!
+    #we need to change the smembers function to be a generator for ids! 
     def ids_for_triple(self,triple):
         sid,pid,oid = triple
        
@@ -114,12 +88,12 @@ class KVIndexRedis(KVIndex):
                     
                                 
 import os                         
-#import shutil #deleting
 from tc import *
-'''represents a spo-type index'''
-
+'''represents a Tokyo Cabinet backed spo-type index'''
 class KVIndexTC(KVIndex):
-    def __init__(self, name="spo", path="." ):
+    
+    def __init__(self, name="spo", path=".", keylength=20 ):
+        super(KVIndexTC, self).__init__(keylength=keylength)
         self.path = os.path.abspath(path)
         self.is_open = INDEX_CLOSED
         self.levels = [] #todo use list
@@ -162,12 +136,13 @@ class KVIndexTC(KVIndex):
             
         
     def add_triple(self, triple):
-        #print "inserting %s %s %s" % triple
-        sid,pid,oid = triple
-        #todo check duplicates 
-        self.levels[0].addint(sid, 1) 
-        self.levels[1].addint("".join([sid,pid]), 1)
-        self.levels[2].put("".join(triple), "") 
+        sid,pid,oid = triple   
+        full_key = "".join(triple)
+        #check if its already in there   
+        if self.levels[2].has_key(full_key):
+            self.levels[0].addint(sid, 1) 
+            self.levels[1].addint("".join([sid,pid]), 1)
+            self.levels[2].put(full_key, "")  
           
         
     def __len__(self):
@@ -217,17 +192,17 @@ class KVIndexTC(KVIndex):
         #print searchstring
         cur = self.levels[2].curnew()
         cur.jump(searchstring) 
-        #while 1, WTF???   
+        #TODO: cleanup while 1, WTF???   
         while 1:
-            next = cur.next() #why cant that be in the while clause... 
+            next = cur.next() 
             # todo: speedup
             if next.startswith(searchstring):
                 yield next
             else: 
-                raise StopIteration 
-
+                raise StopIteration         
+                
+    #untested
     def chunk_generator_for_searchstring(self,searchstring, chunksize):
-        #print searchstring
         cur = self.levels[2].curnew()
         cur.jump(searchstring)
         while 1:
