@@ -4,19 +4,43 @@ class KVIndex(object):
 
  
     def __init__(self, keylength=20):
+        
         self.keylength = keylength
+        setup_reordering_decorators(self.ordering)
+    
+    '''here we change the input and output of 
+    add_triple  (input)
+    count (input)
+    ids_for_triple (input, output) to match the order of the index
+    ''' 
+    def setup_reordering_decorators(self):
+        self.reordering = []
+        for i in self.internal_ordering:
+            self.reordering.append(self.input_ordering.find(i))         
+        self.original_method = self.reorder_wrapper(self.original_method)
+        
+    def reorder_wrapper(self, original_func):
+        def reorder(the_tuple):
+            reordered_tuple = tuple(the_tuple[x] for x in self.reordering)           
+            reordered_tuple = original_func(reordered_tuple)         
+            the_tuple = tuple(reordered_tuple[x] for x in self.reordering)
+            return the_tuple
+        return reorder     
+     
                        
 
 import redis        
 class KVIndexRedis(KVIndex):
     def __init__(self, name="spo", host='localhost', port=6379, path="", keylength=20):
-        self.is_open = INDEX_CLOSED
+        self.is_open = INDEX_CLOSED 
+        self.name = name
+        self.ordering = name
         super(KVIndexRedis, self).__init__(keylength=keylength) 
         self.host = host
         self.port = port
         self.shared = False         
         self.levels = [] #todo use list
-        self.name = name
+        
         self.key_prefix = name
         self.open()
         
@@ -93,11 +117,13 @@ from tc import *
 class KVIndexTC(KVIndex):
     
     def __init__(self, name="spo", path=".", keylength=20 ):
-        super(KVIndexTC, self).__init__(keylength=keylength)
+        self.name = name  
+        self.ordering = name
+        super(KVIndexTC, self).__init__(keylength=keylength, ordering=name)
         self.path = os.path.abspath(path)
         self.is_open = INDEX_CLOSED
         self.levels = [] #todo use list
-        self.name = name
+        
         self.filename_prefix = name
         self.is_open = self.open()
         self.shared = False
