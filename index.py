@@ -4,9 +4,8 @@ class KVIndex(object):
 
  
     def __init__(self, keylength=20):
-        
         self.keylength = keylength
-        setup_reordering_decorators(self.ordering)
+        self.setup_reordering_decorators()
     
     '''here we change the input and output of 
     add_triple  (input)
@@ -17,15 +16,18 @@ class KVIndex(object):
         self.reordering = []
         for i in self.internal_ordering:
             self.reordering.append(self.input_ordering.find(i))         
-        self.original_method = self.reorder_wrapper(self.original_method)
+        print "reordering:"
+        print self.reordering        
+        self.ids_for_triple = self.input_reorder_wrapper(self.ids_for_triple) 
+        self.add_triple = self.input_reorder_wrapper(self.add_triple)
+        self.count = self.input_reorder_wrapper(self.count)
         
-    def reorder_wrapper(self, original_func):
+         
+    def input_reorder_wrapper(self, original_func):
         def reorder(the_tuple):
             reordered_tuple = tuple(the_tuple[x] for x in self.reordering)           
-            reordered_tuple = original_func(reordered_tuple)         
-            the_tuple = tuple(reordered_tuple[x] for x in self.reordering)
-            return the_tuple
-        return reorder     
+            return original_func(reordered_tuple)       
+        return reorder       
      
                        
 
@@ -34,7 +36,8 @@ class KVIndexRedis(KVIndex):
     def __init__(self, name="spo", host='localhost', port=6379, path="", keylength=20):
         self.is_open = INDEX_CLOSED 
         self.name = name
-        self.ordering = name
+        self.internal_ordering = name
+        self.input_ordering = "spo"
         super(KVIndexRedis, self).__init__(keylength=keylength) 
         self.host = host
         self.port = port
@@ -118,8 +121,9 @@ class KVIndexTC(KVIndex):
     
     def __init__(self, name="spo", path=".", keylength=20 ):
         self.name = name  
-        self.ordering = name
-        super(KVIndexTC, self).__init__(keylength=keylength, ordering=name)
+        self.internal_ordering = name
+        self.input_ordering = "spo"
+        super(KVIndexTC, self).__init__(keylength=keylength)
         self.path = os.path.abspath(path)
         self.is_open = INDEX_CLOSED
         self.levels = [] #todo use list
