@@ -1,4 +1,5 @@
 INDEX_OPEN = 42
+#todo: 
 INDEX_CLOSED = 666
 class KVIndex(object):
 
@@ -58,7 +59,7 @@ class KVIndexRedis(KVIndex):
         self.is_open = INDEX_OPEN    
 
     def close(self):
-        pass
+        raise NotImplementedError("not implemented!")
     
     def add_triple(self, triple):
         '''adds a triple. 
@@ -118,6 +119,7 @@ import os
 from tc import *
 '''represents a Tokyo Cabinet backed spo-type index'''
 class KVIndexTC(KVIndex):
+    #TODO: add quad support
     
     def __init__(self, name="spo", path=".", keylength=20 ):
         self.name = name  
@@ -170,9 +172,13 @@ class KVIndexTC(KVIndex):
         full_key = "".join(triple)
         #check if its already in there   
         if self.levels[2].has_key(full_key):
-            self.levels[0].addint(sid, 1) 
-            self.levels[1].addint("".join([sid,pid]), 1)
-            self.levels[2].put(full_key, "")  
+            print "triple already in the store"
+        else:
+            self.levels[2].put(full_key, "") 
+        self.levels[1].addint("".join([sid,pid]), 1) 
+        self.levels[0].addint(sid, 1) 
+            
+             
           
         
     def __len__(self):
