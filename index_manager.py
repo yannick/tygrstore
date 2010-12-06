@@ -6,7 +6,9 @@ class IndexManager(object):
     def __init__(self, naturals="spo", index_class=KVIndexTC):
         self.naturals = naturals
         self.index_class = index_class
-        self.indexes = dict()
+        self.indexes = dict() 
+        self.unique_indexes = []
+        self.build_indexes()
         
     
     '''here we instanciate one index class for every permutation of the naturals string
@@ -16,7 +18,8 @@ class IndexManager(object):
     def build_indexes(self):        
         for p in permutations(self.naturals):           
             index_name = "".join(p)
-            an_index = self.index_class(name=index_name)
+            an_index = self.index_class(name=index_name) 
+            self.unique_indexes.append(an_index)
             for i in range(1,len(p)+1):
                 self.indexes[p[0:i]] = an_index                
         #for (None), (None,None,...) set any index 
@@ -36,7 +39,14 @@ class IndexManager(object):
     def index_for_tuple(self, triple):
         return self.indexes[tuple(self.compress(self.naturals, triple))]    
     
-                        
+    def add_to_all_indexes(self, triple):
+        for idx in self.unique_indexes:
+            idx.add_triple(triple)  
+            
+    def close(self):
+        for idx in self.unique_indexes:
+            idx.close()
+                                               
 #index         
     def string2id(self):
         pass

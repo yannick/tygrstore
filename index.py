@@ -183,7 +183,8 @@ class KVIndexTC(KVIndex):
         
     def __len__(self):
         return len(self.levels[2]) 
-        
+    
+    '''get the selectivity count'''    
     def count(self, triple):
         sid,pid,oid = triple
         if (sid,pid,oid) == (None,None,None):
