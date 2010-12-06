@@ -1,16 +1,21 @@
                           #nosetests
-from stringstore import *
+from index_manager import *
 import os
 
-class Test_Stringstore(object):
+class Test_IndexManager(object):
     
     def setUp(self):
-        #self.stringstore = Stringstore()
         pass
         
     def tearDown(self):
         "tear down test fixtures"
-        pass   
+        pass
+        
+    def test_tc_index(self):
+        pass
+    
+    def get_fresh_index(self, name):
+        pass
             
     def test_crud(self):
         pass
