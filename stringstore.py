@@ -29,7 +29,11 @@ class Stringstore(object):
         id2s.open("id2s.stringstore.bdb", BDBOWRITER | BDBOREADER | BDBOCREAT) 
         
         self.s2id = s2id
-        self.id2s = id2s
+        self.id2s = id2s 
+        
+    def close(self):
+        self.s2id.close()
+        self.id2s.close()
         
     '''add a string and get its key'''        
     def add(self, string):
@@ -44,7 +48,20 @@ class Stringstore(object):
             return new_id
     
     def get(self, key):
-        return self.id2s.get(key)
+        try:
+            return self.id2s.get(key)
+        except KeyError:
+            return "NOT IN STORE"
+            
+    def get_generator(self, list_of_keys):
+        for key in list_of_keys:
+            if key is None:
+                yield None
+            else:
+                yield self.get(key)    
+        
+    def convert_tuple(self, tuple):
+        return tuple(self.get_generator(tuple))
         
     '''return a sha1 as hex string'''
     def sha1_hexdigest_for(self,string):
