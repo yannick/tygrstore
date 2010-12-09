@@ -5,6 +5,8 @@ import pprint
 #what happens if a string is not in the store?
 # filters, unions, subgraphs?
 
+
+#bugs: if the same variable is twice in one triple its not working because of triples_containing
 class QueryEngine(object):
     
     
@@ -92,18 +94,13 @@ class QueryEngine(object):
      ''' 
     def triples_containing(self,var,variables_table):
         for triple in self.selectivities:
-            #print "checking triple"
-            #pprint.pprint(triple)
-            #print "for var"
-            #pprint.pprint(var)
-            #if var` in triple["variables"].keys():`
-            #    #print "var is in triple"
-            #    encoded_triple = list(triple["encoded"])
-            #    for maybe_solved in triple["variables"].keys():
-            #        if variables_table[maybe_solved] is not None:
-            #           encoded_triple[triple["variables"][var]] = variables_table[maybe_solved]          
-            #    yield tuple(encoded_triple) 
-        raise NotImplemented()
+            if var in triple["variables"].keys():
+                #print "var is in triple"
+                encoded_triple = list(triple["encoded"])
+                for maybe_solved in triple["variables"].keys():
+                    if variables_table[maybe_solved] is not None:
+                       encoded_triple[triple["variables"][maybe_solved]] = variables_table[maybe_solved]          
+                yield tuple(encoded_triple) 
         raise StopIteration
                 
      

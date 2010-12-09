@@ -51,8 +51,19 @@ class Stringstore(object):
         try:
             return self.id2s.get(key)
         except KeyError:
-            return "NOT IN STORE"
+            return "NOT IN STORE"  
+         
+    def set(self, key):
+        return self.add(key)
+                       
             
+    def add_generator(self, list_of_keys):
+        for key in list_of_keys:
+            if key is None:
+                yield None
+            else:
+                yield self.add(key)
+                
     def get_generator(self, list_of_keys):
         for key in list_of_keys:
             if key is None:
@@ -60,8 +71,9 @@ class Stringstore(object):
             else:
                 yield self.get(key)    
         
-    def convert_tuple(self, tuple):
-        return tuple(self.get_generator(tuple))
+    def convert_tuple(self, tupl):
+         return tuple(self.get_generator(tupl))
+
         
     '''return a sha1 as hex string'''
     def sha1_hexdigest_for(self,string):
