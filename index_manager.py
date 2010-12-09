@@ -39,6 +39,9 @@ class IndexManager(object):
     def index_for_tuple(self, triple):
         return self.indexes[tuple(self.compress(self.naturals, triple))]    
     
+    def selectivity_for_tuple(self, triple):
+        return self.index_for_tuple(triple).count(triple)
+    
     def add_to_all_indexes(self, triple):
         for idx in self.unique_indexes:
             idx.add_triple(triple)  

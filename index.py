@@ -206,10 +206,12 @@ class KVIndexTC(KVIndex):
                           
     def ids_for_triple(self,triple):
         sid,pid,oid = triple
+        #subject and predicate given
         if sid is not None and pid is not None and oid is None:
             searchstring = "".join([sid,pid])               
-            return self.generator_for_searchstring(searchstring)
-            #search in level2
+            return self.generator_for_searchstring(searchstring,loffset=80,roffset=120)
+            #search in level2 
+        #only subject given
         elif sid is not None and pid is None and oid is None:
             searchstring = sid
             
@@ -217,7 +219,7 @@ class KVIndexTC(KVIndex):
                 #get keys from level1 and then search level2
                 raise NotImplemented("")
             else:
-                return self.generator_for_searchstring(searchstring)
+                return self.generator_for_searchstring(searchstring,loffset=40,roffset=80)
         else:
             raise NotImplementedError("")                
            
@@ -225,7 +227,7 @@ class KVIndexTC(KVIndex):
         
 #generators    
 
-    def generator_for_searchstring(self,searchstring):
+    def generator_for_searchstring(self,searchstring,loffset=0,roffset=40):
         #print searchstring
         cur = self.levels[2].curnew()
         cur.jump(searchstring) 
@@ -233,10 +235,13 @@ class KVIndexTC(KVIndex):
         while 1:
             next = cur.next() 
             # todo: speedup
-            if next.startswith(searchstring):
-                yield next
-            else: 
-                raise StopIteration         
+            try:
+                if next.startswith(searchstring):
+                    yield next[loffset:roffset]
+                else: 
+                    raise StopIteration
+            except KeyError:
+                raise StopIteration          
                 
     #untested
     def chunk_generator_for_searchstring(self,searchstring, chunksize):
