@@ -1,12 +1,19 @@
 INDEX_OPEN = 42
 #todo: 
-INDEX_CLOSED = 666
+INDEX_CLOSED = 666  
+
+import logging
+#LOG_FILENAME = 'index.log'
+#logging.basicConfig(filename=LOG_FILENAME,level=logging.DEBUG)
+
 class KVIndex(object):
 
  
     def __init__(self, keylength=20):
-        self.keylength = keylength
+        self.logger = logging.getLogger("tygrstore.index")
+        self.keylength = keylength        
         self.setup_reordering_decorators()
+        
     
     '''here we change the input and output of 
     add_triple  (input)
@@ -17,8 +24,7 @@ class KVIndex(object):
         self.reordering = []
         for i in self.internal_ordering:
             self.reordering.append(self.input_ordering.find(i))         
-        print "reordering:"
-        print self.reordering        
+        self.logger.info("reordering: %s" % str(self.reordering))      
         self.ids_for_triple = self.input_reorder_wrapper(self.ids_for_triple) 
         self.add_triple = self.input_reorder_wrapper(self.add_triple)
         self.count = self.input_reorder_wrapper(self.count)
@@ -26,8 +32,13 @@ class KVIndex(object):
          
     def input_reorder_wrapper(self, original_func):
         def reorder(the_tuple):
-            reordered_tuple = tuple(the_tuple[x] for x in self.reordering)           
-            return original_func(reordered_tuple)       
+            try:
+                reordered_tuple = tuple(the_tuple[x] for x in self.reordering)           
+                return original_func(reordered_tuple)     
+            except IndexError: 
+                self.logger.error("defect tuple!")
+                self.logger.error( the_tuple  )            
+                #import pdb; pdb.set_trace()       
         return reorder       
      
                        
@@ -121,7 +132,7 @@ from tc import *
 class KVIndexTC(KVIndex):
     #TODO: add quad support
     
-    def __init__(self, name="spo", path=".", keylength=20 ):
+    def __init__(self, name="spo", path="./data_lubm/", keylength=20 ):
         self.name = name  
         self.internal_ordering = name
         self.input_ordering = "spo"
@@ -143,7 +154,7 @@ class KVIndexTC(KVIndex):
              #tuning?             
              fullpath = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
              #print fullpath
-             bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT)
+             bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT )    #BDBOWRITER | BDBOREADER | BDBOCREAT
              self.levels.append(bdb)          
         self.is_open = INDEX_OPEN
         return self.is_open  
@@ -172,14 +183,13 @@ class KVIndexTC(KVIndex):
         full_key = "".join(triple)
         #check if its already in there   
         if self.levels[2].has_key(full_key):
-            print "triple already in the store"
+            pass
+            #print "triple already in the store"
         else:
             self.levels[2].put(full_key, "") 
         self.levels[1].addint("".join([sid,pid]), 1) 
         self.levels[0].addint(sid, 1) 
             
-             
-          
         
     def __len__(self):
         return len(self.levels[2]) 
@@ -209,7 +219,7 @@ class KVIndexTC(KVIndex):
         #subject and predicate given
         if sid is not None and pid is not None and oid is None:
             searchstring = "".join([sid,pid])               
-            return self.generator_for_searchstring(searchstring,loffset=80,roffset=120)
+            return self.generator_for_searchstring(searchstring,loffset=40,roffset=60)
             #search in level2 
         #only subject given
         elif sid is not None and pid is None and oid is None:
@@ -219,7 +229,7 @@ class KVIndexTC(KVIndex):
                 #get keys from level1 and then search level2
                 raise NotImplemented("")
             else:
-                return self.generator_for_searchstring(searchstring,loffset=40,roffset=80)
+                return self.generator_for_searchstring(searchstring,loffset=20,roffset=40)
         else:
             raise NotImplementedError("")                
            
@@ -227,7 +237,7 @@ class KVIndexTC(KVIndex):
         
 #generators    
 
-    def generator_for_searchstring(self,searchstring,loffset=0,roffset=40):
+    def generator_for_searchstring(self,searchstring,loffset=0,roffset=20):
         #print searchstring
         cur = self.levels[2].curnew()
         cur.jump(searchstring) 
@@ -236,7 +246,7 @@ class KVIndexTC(KVIndex):
             next = cur.next() 
             # todo: speedup
             try:
-                if next.startswith(searchstring):
+                if next[0:loffset] == (searchstring):
                     yield next[loffset:roffset]
                 else: 
                     raise StopIteration
