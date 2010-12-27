@@ -1,4 +1,5 @@
-import hashlib
+import hashlib  
+import binascii
 from tc import *
 import os 
 class Stringstore(object):       
@@ -25,8 +26,8 @@ class Stringstore(object):
         #tuning?             
 
         #print fullpath
-        s2id.open("s2id.stringstore.bdb", BDBOWRITER | BDBOREADER | BDBOCREAT) 
-        id2s.open("id2s.stringstore.bdb", BDBOWRITER | BDBOREADER | BDBOCREAT) 
+        s2id.open("%s/s2id.stringstore.bdb" % self.path, BDBOWRITER | BDBOREADER | BDBOCREAT)                      # BDBOWRITER | BDBOREADER | BDBOCREAT
+        id2s.open("%s/id2s.stringstore.bdb" % self.path, BDBOWRITER | BDBOREADER | BDBOCREAT) 
         
         self.s2id = s2id
         self.id2s = id2s 
@@ -41,7 +42,8 @@ class Stringstore(object):
         try:
             return self.s2id.get(string)
         except KeyError:            
-            #we need a new id
+            #we need a new id 
+            #get_new_id is an alias to the function which encodes the string  
             new_id = self.get_new_id(string)
             self.s2id.put(string, new_id )
             self.id2s.put(new_id, string) 
@@ -62,7 +64,7 @@ class Stringstore(object):
             if key is None:
                 yield None
             else:
-                yield self.add(key)
+                yield self.add(key)                               
                 
     def get_generator(self, list_of_keys):
         for key in list_of_keys:
@@ -77,7 +79,7 @@ class Stringstore(object):
         
     '''return a sha1 as hex string'''
     def sha1_hexdigest_for(self,string):
-        return hashlib.sha1(string).hexdigest()
+        return hashlib.sha1(string).digest()
     
     '''return the next int'''    
     def counter(self, string):
