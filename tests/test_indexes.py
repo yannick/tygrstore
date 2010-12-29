@@ -6,7 +6,7 @@ class Test_Tygrstore(object):
 
 
     def setUp(self):
-        self.spo_index_filename = "test_index.bdb"
+        self.spo_index_filename = "db/test_index.bdb"
         self.spo_index = KVIndexRedis(name="spo", path=".")
         status = self.spo_index.is_open
         assert(status == INDEX_OPEN, "could not open index")
