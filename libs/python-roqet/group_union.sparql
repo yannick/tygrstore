@@ -1,0 +1,7 @@
+SELECT * WHERE {
+    { <http://s/0> <http://p/0> ?o }
+    UNION
+    { <http://s/1> <http://p/1> ?o }
+
+    ?o <http://p/2> ?oc . ?oc <http://p/3> "asdf"
+}

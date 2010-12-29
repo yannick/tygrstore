@@ -1,0 +1,6 @@
+dependecies:
+
+tc: pip install tc 
+rasqal: http://download.librdf.org/source/rasqal-0.9.15.tar.gz
+roqet bindings: see lib dir, adjust setup.py !
+cython with generator support from: https://github.com/vitek/cython.git
