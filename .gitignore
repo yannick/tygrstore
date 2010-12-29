@@ -2,3 +2,7 @@
 /reorder.py
 *.so
 */*.pyc
+
+/build/
+/logs/
+*.prof
