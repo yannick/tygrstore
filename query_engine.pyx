@@ -25,7 +25,8 @@ class QueryEngine(object):
         
         
     def execute(self, query):
-        #parse the query string with roqet cython bindings
+        #parse the query string with roqet cython bindings 
+        start = time.time()
         self.parsed = self.parse(query)
         
         self.triples = zip(self.parsed["pattern"]["triples"], self.encode_triples(self.parsed["pattern"]["triples"]) )
@@ -57,9 +58,10 @@ class QueryEngine(object):
         
         next_var = [k for k,v in self.empty_result_set.iteritems() if v == None][0] 
         #pprint.pprint(self.selectivities)
-        #start = time.time()
+         
+        print "preparation took %s seconds" % str((time.time() - start))
         return self.evaluate(self.empty_result_set,next_var) 
-        #print "took %s seconds" % str((time.time() - start))
+        
        
     
         
@@ -125,14 +127,14 @@ class QueryEngine(object):
         if len(triples_with_var) == 1:            
             triple =  triples_with_var[0]
             idx = self.index_manager.index_for_tuple(triple)
-            selectivity = idx.count(triple)
-            return idx.ids_for_triple(triple, num_records=selectivity)
+            #selectivity = idx.count(triple)
+            return idx.ids_for_triple(triple)
         for triple in triples_with_var:                                                
           #print "list" 
           idx = self.index_manager.index_for_tuple(triple) 
-          selectivity = idx.count(triple)
+          #selectivity = idx.count(triple)
           #pprint.pprint( list( self.index_manager.index_for_tuple(triple).ids_for_triple(triple) ) )
-          id_generators.append(idx.ids_for_triple(triple, num_records=selectivity))
+          id_generators.append(idx.ids_for_triple(triple))
         #print "mergejoin"
         #print id_generators  
         return self.multi_merge_join(id_generators)
@@ -147,33 +149,40 @@ class QueryEngine(object):
             
     
     def merge_join(self, left_generator, right_generator):
+        #cdef char* left
+        #cdef char* righ
         left = left_generator.next()
         right = right_generator.next()
+        #print "left:  %s" % binascii.hexlify(left)
+        #print "right: %s" % binascii.hexlify(right)
         while left_generator and right_generator:
             comparison = cmp(right, left)
             if comparison == 0:
+                #print "MATCH"
                 yield left
                 left = left_generator.next()
                 right = right_generator.next()  
             elif comparison > 0:
-                left = left_generator.next()
+                #print "sending right to left"
+                left = left_generator.send(right)
             else:
-                right = right_generator.next()
+                #print "sending left to right"
+                right = right_generator.send(left)
                 
     def merge_join_with_jump(self, left_generator, right_generator):
         raise NotImplemented()
         left = left_generator.next()
-        right = right_generator.next()
+        right = right_generator.next()                               
         while left_generator and right_generator:
             comparison = cmp(right, left)
-            if comparison == 0:
+            if comparison == 0:                
                 yield left
                 left = left_generator.next()
                 right = right_generator.next()  
             elif comparison > 0:
-                left = left_generator.next()
+                left = left_generator.send(right)
             else:
-                right = right_generator.next() 
+                right = right_generator.send(left) 
             
      
     '''replace strings by ids from the stringstore'''       

@@ -1,2 +1,4 @@
 *.pyc
 /reorder.py
+*.so
+*/*.pyc

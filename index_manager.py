@@ -30,7 +30,9 @@ class IndexManager(object):
     #from itertools in python 3.1.2
     def compress(self, data, selectors):
         # ("x", None, "y", None)  -> ("s", "o")
-        return (d for d, s in zip(data, selectors) if s)            
+        return (d for d, s in zip(data, selectors) if s)
+                    
+
                                                      
     def level_for_tuple(self, triple):
         return len(list(self.compress(self.naturals, triple)))
