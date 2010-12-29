@@ -2,7 +2,7 @@
 INDEX_OPEN = 42
 #todo: 
 INDEX_CLOSED = 666  
-
+import binascii
 import logging
 #LOG_FILENAME = 'index.log'
 #logging.basicConfig(filename=LOG_FILENAME,level=logging.DEBUG)
@@ -159,8 +159,13 @@ class KVIndexTC(KVIndex):
              bdb = BDB() 
              #tuning?             
              fullpath = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
-             #print fullpath
-             bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT )    #BDBOWRITER | BDBOREADER | BDBOCREAT
+             #print fullpath 
+             #bdb.tcbdbtune(bdb, 256, 512, 32000000, -1, -1, BDBTLARGE)
+             #bdb.tcbdbsetxmsiz(bdb, 1024*1024*1024*20)
+             bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT )    #BDBOWRITER | BDBOREADER | BDBOCREAT  
+             #bdb.tcbdbtune(bdb, 256, 512, 32000000, -1, -1, ctokyo.BDBTLARGE)
+             #bdb.tcbdbsetxmsiz(bdb, 1024*1024*1024*20)
+             
              self.levels.append(bdb)          
         self.is_open = INDEX_OPEN
         return self.is_open  
@@ -225,7 +230,7 @@ class KVIndexTC(KVIndex):
         #subject and predicate given
         if sid is not None and pid is not None and oid is None:
             searchstring = "".join([sid,pid])               
-            return self.generator_for_searchstring(searchstring,loffset=40,roffset=60, num_records=num_records)
+            return self.generator_for_searchstring_with_jump(searchstring,loffset=40,roffset=60, num_records=num_records)
             #search in level2 
         #only subject given
         elif sid is not None and pid is None and oid is None:
@@ -235,7 +240,7 @@ class KVIndexTC(KVIndex):
                 #get keys from level1 and then search level2
                 raise NotImplemented("")
             else:
-                return self.generator_for_searchstring(searchstring,loffset=20,roffset=40, num_records=num_records)
+                return self.generator_for_searchstring_with_jump(searchstring,loffset=20,roffset=40, num_records=num_records)
         else:
             raise NotImplementedError("")                
            
@@ -270,20 +275,29 @@ class KVIndexTC(KVIndex):
                 except KeyError:
                     raise StopIteration             
 
-    def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=20):
+    def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=20, num_records=0):
         #print searchstring
-        cur = self.levels[2].curnew()
-        cur.jump(searchstring)
+        cur = self.levels[2].curnew() 
+        #print "INIT jumping to: %s " % (binascii.hexlify(jumpto or "") )
+        cur.jump(searchstring)        
         #fixed number of records, this is slower! why?!!????? 
         while 1:
-            next = cur.next() 
-            # todo: speedup
-            try:                        
-                jumpto = yield(next[loffset:roffset])
-                cur.jump(jumpto)    
+            try:
+                next = cur.next()
+                if next[0:loffset] == (searchstring):
+                    jumpto = yield(next[loffset:roffset])
+                    #print "%s jumping to: %s " % (str(self),binascii.hexlify(jumpto or "") )
+                    if jumpto:
+                        cur.jump("".join((searchstring, jumpto)))
+                else: 
+                    raise StopIteration                                           
             except KeyError:
-                raise StopIteration         
+                #print "KeyError"
+                cur = self.levels[2].curnew()
+                cur.jump(next)
+                         
                                              
+  
                                                     
     #untested
     def chunk_generator_for_searchstring(self,searchstring, chunksize):
