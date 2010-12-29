@@ -54,7 +54,9 @@ class IndexManager(object):
     def close(self):
         for idx in self.unique_indexes:
             idx.close()
-                                               
+    
+    def __len__(self):
+        return len(self.unique_indexes[0])                                           
 #index         
     def string2id(self):
         pass
