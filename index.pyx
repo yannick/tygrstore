@@ -278,15 +278,12 @@ class KVIndexTC(KVIndex):
     def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=20, num_records=0):
         #print searchstring
         cur = self.levels[2].curnew() 
-        #print "INIT jumping to: %s " % (binascii.hexlify(jumpto or "") )
         cur.jump(searchstring)        
-        #fixed number of records, this is slower! why?!!????? 
         while 1:
             try:
                 next = cur.next()
                 if next[0:loffset] == (searchstring):
                     jumpto = yield(next[loffset:roffset])
-                    #print "%s jumping to: %s " % (str(self),binascii.hexlify(jumpto or "") )
                     if jumpto:
                         cur.jump("".join((searchstring, jumpto)))
                 else: 
@@ -299,7 +296,7 @@ class KVIndexTC(KVIndex):
                                              
   
                                                     
-    #untested
+    #untested, POC
     def chunk_generator_for_searchstring(self,searchstring, chunksize):
         cur = self.levels[2].curnew()
         cur.jump(searchstring)

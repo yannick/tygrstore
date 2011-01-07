@@ -4,22 +4,26 @@ from itertools import *
 
 class IndexManager(object):
         
-    def __init__(self, naturals="spo", index_class=KVIndexTC):
+    def __init__(self, naturals="spo", index_class=KVIndexTC, path="./data_lubm/"):
         self.naturals = naturals
         self.index_class = index_class
-        self.indexes = dict() 
+        #indexes contains duplicates!
+        self.indexes = dict()
+        #a list of all indexes  
         self.unique_indexes = []
-        self.build_indexes()
+        self.build_indexes(path)
         
     
     '''here we instanciate one index class for every permutation of the naturals string
     we also add a (tuple as) key for every sub-tuple (eg. s,  and s,p and s,p,o  for s,p,o,c) with the index
     as value
     ''' 
-    def build_indexes(self):        
+    def build_indexes(self, path):        
         for p in permutations(self.naturals):           
-            index_name = "".join(p)
-            an_index = self.index_class(name=index_name) 
+            index_name = "".join(p)                          
+            #instanciate a new index. equal to ie: an_index = KVIndexTC()
+            an_index = self.index_class(name=index_name, path)
+             
             self.unique_indexes.append(an_index)
             for i in range(1,len(p)+1):
                 self.indexes[p[0:i]] = an_index                
