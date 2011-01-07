@@ -18,12 +18,7 @@ class QueryEngine(object):
         self.index_manager = index_manager
         self.logger = logging.getLogger("tygrstore.query_engine")
         
-    
-        
-    def set_index_manager(index_manager):
-        self.index_manager = index_manager
-        
-        
+     
     def execute(self, query):
         #parse the query string with roqet cython bindings 
         start = time.time()
@@ -66,43 +61,32 @@ class QueryEngine(object):
     
         
     def evaluate(self, variables_table, var):
-        #if var == 'cd':
-        #    import pdb; pdb.set_trace()
-        #print "eval for var %s and table" % var
         
-        #pprint.pprint(variables_table)
-         
+        #if there are no unsolved variables then return a result set
+        #this could be moved down the line to save a recursion step
         if not [i for i in variables_table.values() if i is None]:
-            #print "we have produced a result:" 
-            #pprint.pprint(self.selectivities)
-            #pprint.pprint(variables_table)
-            
+            result_set = {}            
             for k,v in variables_table.iteritems():
-                yield (k, self.stringstore.get(v))
-           
-            #pprint.pprint(variables_table)
-            #for k,v in variables_table.iteritems():
-            #    print "key: %s   value: %s" % (k, self.stringstore.get(v))
+                 result_set[k] = self.stringstore.get(v)
+            yield result_set
         else:
+            #we need only the triples which contain the unbound variable we search
             triples_with_var = list(self.triples_containing(var, variables_table))
-            #print "all triples with %s" % var
-            #pprint.pprint(triples_with_var)
-            #for trip in triples_with_var:
-            #    pprint.pprint(self.stringstore.convert_tuple(trip))
+            #we then join all the resulting id's 
             for an_id in self.mergejoin_ids(triples_with_var):
-                next_var = None
+                next_var = None                  
+                #set the var as solved
                 variables_table[var] = an_id
-                #print "var table: for id %s" % an_id
-                #pprint.pprint(variables_table)
-                try:
+                try:                  
+                    #take any unsolved variable
                     next_var = [k for k,v in variables_table.iteritems() if v == None].pop()
                 except:
-                    #print "OMGRESULT"
                     next_var = None
-                #print "recursion ++ with id: %s and next var %s" % (an_id, next_var)
+                #self.logger.debug( "recursion ++ with id: %s and next var %s" % (an_id, next_var)  ) 
                 for res in self.evaluate(variables_table, next_var):
                     yield res
-                #print "recursion --" 
+                #print "recursion --"
+                #unset the just solved var 
                 variables_table[var] = None     
                                       
     
