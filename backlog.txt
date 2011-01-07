@@ -1,0 +1,33 @@
+
+TODOs/Issues:
+
+    - dynamic code for triple reversing for individual indexes
+    - sharing indexes
+    - merge sort with jumping
+    - quad support in indexes not finished
+    - fixes/changes in tc need to be ported to redis
+    - result generation in batches
+    - port to kyoto [ cancelled. tbd]
+    - redesign query engine (almost done)
+    - importer
+    - ints as keys
+    - Bug: same var in same triple
+    - inconsistent naming of functions
+    - add_triple has wrapper, when used trough index manager, make one without for fast bulk import
+    - yield only variables which are selected in query       
+    - debugging, index access count ( statistician )
+    - bug: literals and uris are the same. how to handle? "<uri>" vs "uri" ?
+    - update rasqal/roqet bindings
+    - configuration system/file
+    
+
+
+
+
+
+
+
+
+
+
+
