@@ -6,3 +6,7 @@
 /build/
 /logs/
 *.prof
+/index.c
+/index_manager.c
+/query_engine.c
+/stringstore.c
