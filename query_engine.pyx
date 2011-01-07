@@ -5,11 +5,8 @@ import heapq
 import pprint  
 import time   
 import logging
-#what happens if a string is not in the store?
-# filters, unions, subgraphs?
 
 
-#bugs: if the same variable is twice in one triple its not working because of triples_containing
 class QueryEngine(object):
     
     
@@ -59,9 +56,9 @@ class QueryEngine(object):
         
        
     
-        
-    def evaluate(self, variables_table, var):
-        
+    '''the recursively called evaluate function'''    
+    def evaluate(self, variables_table, var):     
+        #TODO: OPTIMIZE, a lot of time is lost here   
         #if there are no unsolved variables then return a result set
         #this could be moved down the line to save a recursion step
         if not [i for i in variables_table.values() if i is None]:

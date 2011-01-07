@@ -5,13 +5,17 @@ from sha1_store import *
 from stringstore import *
 from index_manager import *
 
-
+'''simple importer''' 
 class TygerstoreImporter2(object):
     
-    def importall(file):
+    def setup(path="./data_lubm/"):
         plugin.register( 'Sha1Store', rdflib.store.Store,'sha1_store', 'Sha1Store')
         self.g = Graph(store="Sha1Store")
-        self.stringstore = Stringstore(mode="sha1", store="tc", path="./data_lubm/")
+        self.g.stringstore = Stringstore(mode="sha1", store="tc", path)
+        self.g.index_manager = IndexManager()
+        
+    def import_file(file, format="nt"):
+        self.g.parse(file, format=format)
         
 class TygerstoreImporter(object):
     
@@ -20,7 +24,6 @@ class TygerstoreImporter(object):
         self.format = format
         plugin.register( 'Sha1Store', rdflib.store.Store,'sha1_store', 'Sha1Store')
         self.g = Graph(store="Sha1Store")   
-        print plugin._plugins
         self.outfile = open('data_lubm/spo.hxid', 'w')        
         self.stringstore = Stringstore(mode="sha1", store="tc", path="./data_lubm/")
         self.g.store.outfile = self.outfile
