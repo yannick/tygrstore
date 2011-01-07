@@ -19,7 +19,7 @@ TODOs/Issues:
     - bug: literals and uris are the same. how to handle? "<uri>" vs "uri" ?
     - update rasqal/roqet bindings
     - configuration system/file
-    
+    - Bug:  results are not distinct
 
 
 
