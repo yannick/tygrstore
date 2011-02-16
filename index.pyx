@@ -63,7 +63,8 @@ class KVIndexRedis(KVIndex):
         
         self.key_prefix = name
         self.open()
-        
+    
+    '''deletes all levels of the database'''    
     def delete(self):
         for r in self.levels:
             r.flushdb()
@@ -161,6 +162,7 @@ class KVIndexTC(KVIndex):
              fullpath = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
              #print fullpath 
              #bdb.tcbdbtune(bdb, 256, 512, 32000000, -1, -1, BDBTLARGE)
+             # int32_t lmemb, int32_t nmemb, int64_t bnum, int8_t apow, int8_t fpow, uint8_t opts
              #bdb.tcbdbsetxmsiz(bdb, 1024*1024*1024*20)
              bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT )    #BDBOWRITER | BDBOREADER | BDBOCREAT  
              #bdb.tcbdbtune(bdb, 256, 512, 32000000, -1, -1, ctokyo.BDBTLARGE)
@@ -183,6 +185,8 @@ class KVIndexTC(KVIndex):
     def delete(self):
         '''deletes all databases'''
         close = self.close()
+        if (close != INDEX_CLOSED):
+            raise
         for i in range(0,3):
             filen = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
             #unlink/delete not working, why??? 
@@ -193,9 +197,8 @@ class KVIndexTC(KVIndex):
         sid,pid,oid = triple   
         full_key = "".join(triple)
         #check if its already in there   
-        if self.levels[2].has_key(full_key):
-            pass
-            #print "triple already in the store"
+        if self.levels[2].has_key(full_key):            
+            self.logger.debug("triple already in the store: %s" % str(triple)) 
         else:
             self.levels[2].put(full_key, "") 
         self.levels[1].addint("".join([sid,pid]), 1) 
