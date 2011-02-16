@@ -38,20 +38,65 @@ def flush_rbtree(tree, dirpath, filenumber):
         f.write(key + " " + tree[key] + "\n")
     f.close()
     print "...finished"
-    
+
+def flush_s2id(s2id_tree, s2id_config, dirpath, filename, filenumber):
+    sys.stdout.write("flushing s2id") 
+    sys.stdout.flush() 
+    s2id_tree.close()
+    del(s2id_tree)
+    s2id_tree = kc.DB()  #rbtree.rbtree() 
+    filename = os.path.join(dirpath, "id2s." + str(filenumber) + ".kct")
+    s2id_tree.open(filename + s2id_config, kc.DB.OWRITER | kc.DB.OCREATE)
+    print "done"
+    return s2id_tree
+
+def flush_heaps(heaps, options, filenumber, dirpath, inmemory_size):                                
+    for index_name,dbhandle in heaps.iteritems():
+        fname = "".join(index_name) + "." + str(options.key_length) + "." + str(filenumber) + ".hxidx.kct"
+        full_fname = os.path.join(dirpath, fname)
+        sys.stdout.write("writing file " + full_fname) 
+        out_db = kc.DB()
+        out_db.open(full_fname + '#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE) 
+        sys.stdout.flush()
+        for i in range(len(dbhandle)): 
+            if (i % (inmemory_size/10) == 0):
+                sys.stdout.write(".")
+                sys.stdout.flush()
+            out_db.set( heapq.heappop(dbhandle), '')
+        out_db.close()        
+        print "closed & flushed."                     
+        #print fname + " closed and db cleared"
+
+#flushes to a file, binary format, just keys one after another, uses double the space
+def flush_heaps_to_file(heaps, options, filenumber, dirpath, inmemory_size):                                
+    for index_name,dbhandle in heaps.iteritems():
+        fname = "".join(index_name) + "." + str(options.key_length) + "." + str(filenumber) + ".hxidx.bin"
+        full_fname = os.path.join(dirpath, fname)
+        sys.stdout.write("writing file " + full_fname) 
+        f = open(full_fname, 'wb')
+        sys.stdout.flush()
+        for i in range(len(dbhandle)): 
+            if (i % (inmemory_size/10) == 0):
+                sys.stdout.write(".")
+                sys.stdout.flush()
+            f.write(heapq.heappop(dbhandle))
+        f.close()
+        print "closed & flushed."                     
+        #print fname + " closed and db cleared"         
+                
 def process(hashf, options): 
     dirpath = options.path
     inmemory_size = options.inmemory_size 
     s2id_config = '#bnum=1000k#psiz=65536#pccap=32m#opts=c'
        
-    trees = {}
+    heaps = {}
     for p in permutations("spo"):
         #db = kc.DB()
         #filename = os.path.join(dirpath, p + ".kct"
         #db.open('%#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE)
         #db.open(filename + '#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE) 
         #trees[p] = db
-        trees[p] = []
+        heaps[p] = []
         
     s2id_tree = kc.DB()  #rbtree.rbtree() 
     filename = os.path.join(dirpath, "id2s.0.kct")
@@ -86,24 +131,10 @@ def process(hashf, options):
                 #write temporary files
                 print "adding %i keys took %f seconds. avg %f /second" % (inmemory_size, time.time() - start_time, inmemory_size / (time.time() - start_time) )                                                
                 print "now flushing indexes"
+               
                 start_flushing = time.time()
-                for index_name,dbhandle in trees.iteritems():
-                    fname = "".join(index_name) + "." + str(options.key_length) + "." + str(filenumber) + ".hxidx.kct"
-                    full_fname = os.path.join(dirpath, fname)
-                    sys.stdout.write("writing file " + full_fname) 
-                    #f = open(full_fname, 'bw')
-                    out_db = kc.DB()
-                    out_db.open(full_fname + '#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE) 
-                    sys.stdout.flush()
-                    for i in range(len(dbhandle)): 
-                        if (i % (inmemory_size/10) == 0):
-                            sys.stdout.write(".")
-                            sys.stdout.flush()
-                        out_db.set( heapq.heappop(dbhandle), '')
-                    out_db.close()
-                    print "closed & flushed."                     
-                    #print fname + " closed and db cleared"  
-                
+                 
+                flush_heaps(heaps, options, filenumber, dirpath, inmemory_size)                
                 
                  
                 flush_time = time.time() - start_flushing
@@ -111,15 +142,8 @@ def process(hashf, options):
                     
                 filenumber += 1 
                 
+                s2id_tree = flush_s2id(s2id_tree, s2id_config, dirpath, filename, filenumber)
                 
-                sys.stdout.write("flushing s2id") 
-                sys.stdout.flush() 
-                s2id_tree.close()
-                del(s2id_tree)
-                s2id_tree = kc.DB()  #rbtree.rbtree() 
-                filename = os.path.join(dirpath, "id2s." + str(filenumber) + ".kct")
-                s2id_tree.open(filename + s2id_config, kc.DB.OWRITER | kc.DB.OCREATE)
-                print "done"
                 
                 counter = 0                      
                 start_time = time.time() 
@@ -133,12 +157,13 @@ def process(hashf, options):
             s2id_tree[o] = obje
 
             
-            for index_name,filehandle in trees.iteritems():
+            for index_name,filehandle in heaps.iteritems():
                 key = "".join( ( locals()[index_name[0]], locals()[index_name[1]], locals()[index_name[2]] ))  
                 heapq.heappush(filehandle, key )
                 
 
-               
+        
+        s2id_tree = flush_s2id(s2id_tree, s2id_config, dirpath, filename, filenumber)       
         s2id_tree.close()
         #flush_rbtree(s2id_tree, dirpath, filenumber) 
     
