@@ -42,6 +42,7 @@ def flush_rbtree(tree, dirpath, filenumber):
 def process(hashf, options): 
     dirpath = options.path
     inmemory_size = options.inmemory_size 
+    s2id_config = '#bnum=1000k#psiz=65536#pccap=32m#opts=c'
        
     trees = {}
     for p in permutations("spo"):
@@ -53,8 +54,8 @@ def process(hashf, options):
         trees[p] = []
         
     s2id_tree = kc.DB()  #rbtree.rbtree() 
-    filename = os.path.join(dirpath, "id2s.kct")
-    s2id_tree.open(filename + '#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE)
+    filename = os.path.join(dirpath, "id2s.0.kct")
+    s2id_tree.open(filename + s2id_config, kc.DB.OWRITER | kc.DB.OCREATE)
     #s2id_tree.open('%#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE)        
 
     (subj,pred,obje) = (s,p,o) = ("","","")    
@@ -63,6 +64,7 @@ def process(hashf, options):
     counter = 0
     filenumber = 0  
 
+    reporting_step = inmemory_size / 10
     
     start_time = time.time()
     round_time = time.time()
@@ -70,43 +72,55 @@ def process(hashf, options):
     try:
         for line in sys.stdin:
 
-              
-            [(subj,pred,obje)] = triplematch.findall(line)
-            
+            try:   
+                [(subj,pred,obje)] = triplematch.findall(line)
+            except:
+                print "could not parse line: %s" % line
+                
             #print "%i %i" % (counter, inmemory_size)   
-            if (counter % 100000 == 0):
-                print "%i (importing %f triples per second)" % (counter, (100000.0 / (time.time() - round_time)))
-                round_time = time.time()    
+            if (counter % reporting_step == 0):
+                print "%i (importing %f triples per second)" % (counter, (reporting_step / (time.time() - round_time)))
+                round_time = time.time()   
+                 
             if (counter >= inmemory_size):
                 #write temporary files
                 print "adding %i keys took %f seconds. avg %f /second" % (inmemory_size, time.time() - start_time, inmemory_size / (time.time() - start_time) )                                                
                 print "now flushing indexes"
-                
+                start_flushing = time.time()
                 for index_name,dbhandle in trees.iteritems():
                     fname = "".join(index_name) + "." + str(options.key_length) + "." + str(filenumber) + ".hxidx.kct"
                     full_fname = os.path.join(dirpath, fname)
-                    print "writing file " + full_fname
+                    sys.stdout.write("writing file " + full_fname) 
                     #f = open(full_fname, 'bw')
                     out_db = kc.DB()
                     out_db.open(full_fname + '#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE) 
-                    for i in range(len(dbhandle)):
+                    sys.stdout.flush()
+                    for i in range(len(dbhandle)): 
+                        if (i % (inmemory_size/10) == 0):
+                            sys.stdout.write(".")
+                            sys.stdout.flush()
                         out_db.set( heapq.heappop(dbhandle), '')
-                    out_db.close()                     
-                    print fname + " closed and db cleared"  
+                    out_db.close()
+                    print "closed & flushed."                     
+                    #print fname + " closed and db cleared"  
                 
-
-                #full_fname = os.path.join(dirpath, "id2s.kct")
-                #print "now writing id2s to " + full_fname
-                #f = open(full_fname, 'w')
-                #cur = s2id_tree.cursor()
-                #cur.jump("")
-                #for record in cur:                    
-                #    f.write(" ".join((ba.hexlify(cur.get_key()), cur.get_value())))
-                #f.close() 
-                #s2id_tree.clear()                               
-                #print "done"
+                
+                 
+                flush_time = time.time() - start_flushing
+                print "flushing took %i seconds. makes totaltime of %f    overal avg that is %f triples per second" % ( flush_time, time.time() - start_time, inmemory_size / (time.time() - start_time)  )
                     
-                filenumber += 1
+                filenumber += 1 
+                
+                
+                sys.stdout.write("flushing s2id") 
+                sys.stdout.flush() 
+                s2id_tree.close()
+                del(s2id_tree)
+                s2id_tree = kc.DB()  #rbtree.rbtree() 
+                filename = os.path.join(dirpath, "id2s." + str(filenumber) + ".kct")
+                s2id_tree.open(filename + s2id_config, kc.DB.OWRITER | kc.DB.OCREATE)
+                print "done"
+                
                 counter = 0                      
                 start_time = time.time() 
             
@@ -149,7 +163,7 @@ def main():
                    action='store', dest='path', default=".",
                    help='the key length in bytes')
     parser.add_option('-s','--size', type='long',
-                    action='store', dest='inmemory_size', default=10000000,
+                    action='store', dest='inmemory_size', default=1000000,
                     help='the number of keys that should be cached until the id2string file is flushed to disk')                         
                                            
     (options, args) = parser.parse_args()
