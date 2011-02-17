@@ -162,7 +162,7 @@ def process(hashf, options):
                 heapq.heappush(filehandle, key )
                 
 
-        
+        flush_heaps(heaps, options, filenumber, dirpath, inmemory_size)
         s2id_tree = flush_s2id(s2id_tree, s2id_config, dirpath, filename, filenumber)       
         s2id_tree.close()
         #flush_rbtree(s2id_tree, dirpath, filenumber) 
