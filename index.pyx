@@ -201,8 +201,8 @@ class KVIndexTC(KVIndex):
             self.logger.debug("triple already in the store: %s" % str(triple)) 
         else:
             self.levels[2].put(full_key, "") 
-        self.levels[1].addint("".join([sid,pid]), 1) 
-        self.levels[0].addint(sid, 1) 
+            self.levels[1].addint("".join([sid,pid]), 1) 
+            self.levels[0].addint(sid, 1) 
             
         
     def __len__(self):
