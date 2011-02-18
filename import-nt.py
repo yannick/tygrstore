@@ -14,10 +14,12 @@ import heapq
 
 uri = r'<[^:]+:[^\s"<>]+>' 
 langtag = r'@[a-z]+-[A-Za-z0-9]+'
-dtype =          r'\^{2}' + uri
+dtype =          r'\^{2}' + uri  
+bnode = r'_:[A-Za-z][A-Za-z0-9]*'
+
 literal =  r'"[^"\\]*(?:\\.[^"\\]*)*"'
 literalplus = literal + r'(?:' + langtag + r'|' + dtype + r')?'
-wholeline = r'(' + uri + r')\s' + r'(' +  uri + r')\s' + r'(' + uri + "|" + literalplus + r')\s.\n'
+wholeline = r'(' + uri + "|" + bnode + r')\s' + r'(' +  uri + r')\s' + r'(' + uri + "|" + literalplus + "|" + bnode + r')\s.\n' 
 
 triplematch = re.compile(wholeline)     
 
