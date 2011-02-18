@@ -1,5 +1,6 @@
 # cython: profile=True
 from index import *
+from indexkc import *
 from itertools import *
 
 class IndexManager(object):
