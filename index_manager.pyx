@@ -23,7 +23,7 @@ class IndexManager(object):
         for p in permutations(self.naturals):           
             index_name = "".join(p)                          
             #instanciate a new index. equal to ie: an_index = KVIndexTC()
-            an_index = self.index_class(name=index_name, path)
+            an_index = self.index_class(name=index_name, path=path)
              
             self.unique_indexes.append(an_index)
             for i in range(1,len(p)+1):
