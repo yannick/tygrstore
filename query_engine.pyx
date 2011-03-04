@@ -1,93 +1,173 @@
 # cython: profile=True
-import roqet
 from stringstore import *
+import stringstore
 import heapq
 import pprint  
 import time   
 import logging
-
-
+import cysparql as sparql
+import binascii 
+from helpers import *
+class BGP(object):
+      def __init__(self, context=None, optional=False):
+          self.optional = optional
+          self.context = context
+          self.triples = []
+          
+      
+class ResultSet(object):
+    def __init__(self,variables, triples):
+        self.triples = triples
+        self.variables = list(variables)
+        self.unsolved_variables = list(variables)
+        self.solutions = dict((var,None) for var in variables)     
+        
+    def triples_with_var(self,var):
+        return [triple for triple in self.triples if (triple.unsolved_variables.count(var) > 0 )]
+                             
+    '''set the variable as resolved'''
+    def resolve(self, var, solution):
+        #import pdb; pdb.set_trace()
+        for triple in self.triples:
+            triple.resolve(var, solution)
+        #try:
+        self.unsolved_variables.remove(var)
+        #except ValueError:
+        #    pass #just setting a new value
+        self.solutions[var] = solution   
+    
+    def unresolve(self, var):
+        for triple in self.triples:
+            triple.unresolve(var)
+        self.unsolved_variables.insert(0,var)        
+        self.solutions[var] = None
+            
+    def __str__(self):
+        return "ResultSet with unsolved: %s and %s triples" % (str(self.unsolved_variables), len(self.triples))
+           
+class Triple(object):
+    def __init__(self,cysparql_triple):
+        #import pdb; pdb.set_trace()
+        self.ids = list(cysparql_triple.as_id_tuple()) #self.stringstore.get_ids_from_tuple( cysparql_triple.n3(withvars=False) )
+        self.variables = list(cysparql_triple.variables)
+        self.variables_tuple = cysparql_triple.as_var_tuple()
+        print str(self.variables)
+        self.n3 = cysparql_triple.n3(withvars=False)
+        self.unsolved_variables = list(self.variables)
+        self.selectivity = cysparql_triple.selectivity
+        
+    def __str__(self):
+        return "triple: " + str(self.n3) + " variables: " + str(self.variables)
+    
+    def resolve(self,var,solution):
+        if self.variables.count(var) > 0:         
+            self.ids[self.variables_tuple.index(var)] = solution
+            self.unsolved_variables.remove(var)
+    
+    def unresolve(self,var):
+        if self.variables.count(var) > 0:
+            self.unsolved_variables.insert(0,var)
+            self.ids[self.variables_tuple.index(var)] = None   
+    
+    def ids_as_tuple(self):
+        return tuple(self.ids) 
+                        
 class QueryEngine(object):
     
     
-    def __init__(self, stringstore, index_manager):
+    def __init__(self, stringstore, index_manager, config_file):
         self.stringstore = stringstore
         self.index_manager = index_manager
         self.logger = logging.getLogger("tygrstore.query_engine")
-        
-     
-    def execute(self, query):
-        #parse the query string with roqet cython bindings 
-        start = time.time()
-        self.parsed = self.parse(query)
-        
-        self.triples = zip(self.parsed["pattern"]["triples"], self.encode_triples(self.parsed["pattern"]["triples"]) )
-        
-        #todo: rename selectivities, its the enriched list of all triple patterns
-        # create a list with a dict per entry, keys: original: original triple, encoded: encoded triple, selectivity: the selectivity
-        self.selectivities = [ { "original":x[0] , "encoded":x[1], "selectivity" : self.index_manager.selectivity_for_tuple(x[1]) } for x in self.triples] 
-        #todo: rewrite, use list comprehensions
-        #also add a list of all the vars which a pattern includes, for further ease of access   
-        for trip in self.selectivities:
-            if "variables" not in trip.keys():
-                trip["variables"] = {}
-            for tup in trip["original"]:
-                #print "doing tuple:"
-                #pprint.pprint(tup)
-                if tup[0] == 'var':
-                    #print "adding %s to variables" % tup[1]
-                    trip["variables"][tup[1]] = trip["original"].index(tup)   
-                
-        #sort by selectivity
-        self.selectivities = sorted(self.selectivities, key=lambda x: x["selectivity"])
-        self.empty_result_set = {}
-         
-        #get all unbound variables into empty_result_set    
-        for i in self.selectivities:
-            for var in i["original"]:
-                if var[0] == 'var':
-                    self.empty_result_set[var[1]] = None
-        
-        next_var = [k for k,v in self.empty_result_set.iteritems() if v == None][0] 
-        #pprint.pprint(self.selectivities)
-         
-        print "preparation took %s seconds" % str((time.time() - start))
-        return self.evaluate(self.empty_result_set,next_var) 
-        
-       
+        self.config = config_file
     
+    def execute2(self, query):
+        #parse the query
+        self.sparql_query = sparql.Query(query)
+         
+
+        
+        triples = []    
+        
+        current_gp = self.sparql_query.graph_pattern
+        #encode and set selectivity  
+        self.logger.debug("encoding triples and get selectivities")
+        for triple in current_gp:
+            #encode triples 
+            #self.logger.debug("using triple %s %s %s" % triple.n3(withvars=True))
+            ids = self.stringstore.get_ids_from_tuple( triple.n3(withvars=False) )
+            #self.logger.debug("spo triple %s,%s,%s" % (triple.s.value, triple.p.value, triple.o.value)) 
+            triple.encode(ids[0],ids[1],ids[2], numeric=eval(self.config.get("general", "numeric_ids")))
+            #get selectivities 
+            sel = self.index_manager.selectivity_for_tuple(ids)
+            self.logger.debug("got selectivity of %s" % sel)
+            triple.selectivity = sel    
+            #create a new Triple object and add it to all triples
+            triples.append(Triple(triple))   
+            
+        #put all variables into a dict
+        #old self.empty_result_set = dict( (var.name, None) for var in self.sparql_query.vars)
+        #self.logger.debug("sorting by selectivity")    
+        triples = sorted(triples, key=lambda a_triple: a_triple.selectivity) 
+        #import pdb; pdb.set_trace()    
+        empty_result_set = ResultSet([var.name for var in self.sparql_query.vars], triples)   
+            
+                
+        
+        firstvar = empty_result_set.triples[0].variables[0]
+        #self.logger.debug("choosing %s as first variable to solve" % firstvar)
+        #empty_result_set = dict([(var.name,None) for var in self.sparql_query.vars])
+        #self.logger.debug("calling evaluate2 with " + str(empty_result_set) + "firstvar: " + firstvar + " triples: " + str(triples))   
+        for res in self.evaluate2(empty_result_set, firstvar):             
+            yield self.id2s_hash(res)
+                
     '''the recursively called evaluate function'''    
-    def evaluate(self, variables_table, var):     
+    def evaluate2(self, result_set, var):
+        #self.logger.debug("evaluate2 for var " + str(var) + " and triples: " + str(result_set.triples_with_var(var)))  
+        #self.logger.debug("----solutions: " + str(result_set.solutions)   + "\n-----") 
+        #if var == "x":
+        #    import pdb; pdb.set_trace()
         #TODO: OPTIMIZE, a lot of time is lost here   
         #if there are no unsolved variables then return a result set
         #this could be moved down the line to save a recursion step
-        if not [i for i in variables_table.values() if i is None]:
-            result_set = {}            
-            for k,v in variables_table.iteritems():
-                 result_set[k] = self.stringstore.get(v)
-            yield result_set
-        else:
-            #we need only the triples which contain the unbound variable we search
-            triples_with_var = list(self.triples_containing(var, variables_table))
-            #we then join all the resulting id's 
-            for an_id in self.mergejoin_ids(triples_with_var):
-                next_var = None                  
-                #set the var as solved
-                variables_table[var] = an_id
-                try:                  
-                    #take any unsolved variable
-                    next_var = [k for k,v in variables_table.iteritems() if v == None].pop()
-                except:
-                    next_var = None
-                #self.logger.debug( "recursion ++ with id: %s and next var %s" % (an_id, next_var)  ) 
-                for res in self.evaluate(variables_table, next_var):
-                    yield res
-                #print "recursion --"
-                #unset the just solved var 
-                variables_table[var] = None     
-                                      
-    
-  
+        #if len(result_set.unsolved_variables) == 0:
+        #    self.logger.debug("FOUND RESULTS!")
+        #    yield result_set.solutions
+        #else:
+        #we need only the triples which contain the unbound variable we search  
+        # triple.n3(withvars=False)
+        #triples_with_var = [triple.as_id_tuple() for triple in triples if (var in triple.variables)]
+        triples_with_var = result_set.triples_with_var(var) 
+      
+        #we then join all the resulting id's                                                        
+        for an_id in self.mergejoin_ids(triples_with_var, var):                                          
+            #import pdb; pdb.set_trace()                                                                         
+            #set the var as solved                                                                  
+            result_set.resolve(var, an_id) 
+            next_var = None
+            if len(result_set.unsolved_variables) > 0:                                                        
+                next_var =  result_set.unsolved_variables[0]                                                  
+                #print "recursion ++ with new var %s" % next_var
+                #self.logger.debug("recursion ++ with new var %s" % next_var)
+                for res in self.evaluate2(result_set, next_var):                                    
+                    yield res                                                                           
+                #self.logger.debug("recursion --")                                                                  
+                #unset the just solved var                                                              
+                result_set.unresolve(var)
+            else:
+                 #self.logger.debug("FOUND RESULTS!")
+                 #self.logger.debug("----solutions: " + str(result_set.solutions)   + "\n-----")                  
+                 yield result_set.solutions
+                 #import pdb; pdb.set_trace() 
+                 result_set.unresolve(var)
+                 #
+                 # self.logger.debug("UNRESOLVE %s" % var)
+ 
+    def id2s_hash(self, solution):
+        return dict( (k, self.stringstore.id2s(v)) for k,v in solution.iteritems())
+                                                            
+                                                                                            
+ 
     '''get a tuple of encoded ids which have a certain variable in the original query
      also replace solved variables from the with_solved table with their ids
      ''' 
@@ -103,40 +183,35 @@ class QueryEngine(object):
         raise StopIteration
                 
      
-    def mergejoin_ids(self,triples_with_var):
-        id_generators = [] 
+    def mergejoin_ids(self,triples_with_var, var):        
+        id_generators = []  
         if len(triples_with_var) == 1:            
-            triple =  triples_with_var[0]
-            idx = self.index_manager.index_for_tuple(triple)
-            #selectivity = idx.count(triple)
-            return idx.ids_for_triple(triple)
+            return self.index_manager.ids_for_ttriple(triples_with_var[0], var)
         for triple in triples_with_var:                                                
-          #print "list" 
-          idx = self.index_manager.index_for_tuple(triple) 
-          #selectivity = idx.count(triple)
-          #pprint.pprint( list( self.index_manager.index_for_tuple(triple).ids_for_triple(triple) ) )
-          id_generators.append(idx.ids_for_triple(triple))
-        #print "mergejoin"
-        #print id_generators  
+            id_generators.append(self.index_manager.ids_for_ttriple(triple, var))
         return self.multi_merge_join(id_generators)
     
     
     def multi_merge_join(self, generators):
         #generators = list(generators)
+        
         result = generators.pop()
-        while generators:
+        
+        while len(generators) > 0:
             result = self.merge_join(result, generators.pop())
         return result
             
     
     def merge_join(self, left_generator, right_generator):
         #cdef char* left
-        #cdef char* righ
+        #cdef char* righ  
+        
         left = left_generator.next()
         right = right_generator.next()
         #print "left:  %s" % binascii.hexlify(left)
         #print "right: %s" % binascii.hexlify(right)
         while left_generator and right_generator:
+            #self.logger.debug("comparing: %s to %s" % (self.stringstore.id2s(left), self.stringstore.id2s(right)))
             comparison = cmp(right, left)
             if comparison == 0:
                 #print "MATCH"
@@ -165,12 +240,17 @@ class QueryEngine(object):
             else:
                 right = right_generator.send(left) 
             
-     
+    
+    #old 
     '''replace strings by ids from the stringstore'''       
     def encode_triples(self,triples):
         for triple in triples:                                                     
             #parse the roqet triple to get string or none, replace the string by id and yield a tuple
             yield tuple(self.stringstore.add_generator(self.parse_roqet_triple(triple)))
+     
+    def encode_query(self):
+        for triple in self.sparql_query:
+            triple.encoded = self.stringstore.get_ids_from_tuple(triple.tuple_of_strings)
     
     '''contstruct a tuple of None and Strings
     

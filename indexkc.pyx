@@ -3,22 +3,21 @@ import kyotocabinet as kc
 import binascii
 import logging
 from index import *
-
-'''represents a Kyot Cabinet backed spo-type index'''
-class KVIndexTC(KVIndex):
+from helpers import *
+'''represents a Kyoto Cabinet backed spo-type index'''
+class KVIndexKC(KVIndex):
     #TODO: add quad support
     
-    def __init__(self, name="spo", path="./data_lubm/", keylength=16 ): 
-        self.keylength = keylength
-        self.name = name  
-        self.internal_ordering = name
-        self.input_ordering = "spo"
-        # hmm http://fuhm.net/super-harmful/
-        super(KVIndexTC, self).__init__(keylength=keylength)
-        self.path = os.path.abspath(path)
+    def __init__(self,config_file, name="spo"): 
         self.is_open = INDEX_CLOSED
-        self.levels = [] #todo use list
-        
+        self.config_file = config_file          
+        self.path = os.path.abspath(self.config_file.get("database", "path"))        
+        #self.internal_ordering = name
+        #self.input_ordering = len(name)
+        # hmm http://fuhm.net/super-harmful/
+        #setup_reordering_decorators and set keylength
+        super(KVIndexKC, self).__init__(self.config_file,name)                
+        self.levels = []       
         self.filename_prefix = name
         self.is_open = self.open()
         self.shared = False
@@ -28,11 +27,16 @@ class KVIndexTC(KVIndex):
         if self.is_open == INDEX_OPEN:
             return INDEX_OPEN
         for lvl in range(0,3):
-             bdb = kc.DB() 
-             #tuning?
-                           
+             bdb = kc.DB()                           
              fullpath = os.path.join(self.path, "%s%s.kct" % (self.filename_prefix, str(lvl))) 
-             if not bdb.open(fullpath, kc.DB.OREADER):
+             self.logger.debug("opening: " + os.path.join(self.path, "%s%s.kct" % (self.filename_prefix, str(lvl))))  
+             #open all indexes according to the config either read only or updateable
+             if eval(self.config_file.get("general","updateable")):
+                 rw_opts = kc.DB.OCREATE | kc.DB.OWRITER
+             else:
+                 rw_opts = kc.DB.OREADER
+                 
+             if not bdb.open(fullpath, rw_opts):
                  raise BaseException("could not open %s" % fullpath)
              self.levels.append(bdb)          
         self.is_open = INDEX_OPEN
@@ -60,42 +64,61 @@ class KVIndexTC(KVIndex):
             
         
     def add_triple(self, triple):
-        sid,pid,oid = triple   
+        #sid,pid,oid = triple   
         full_key = "".join(triple)
         #check if its already in there   
-        if self.levels[2].get(full_key):            
-            self.logger.debug("triple already in the store: %s" % str(triple)) 
+        if self.levels[-1].get(full_key):            
+            self.logger.debug("triple/quad already in the store: %s" % str(triple)) 
         else:
-            self.levels[2].set(full_key, "") 
-            self.levels[1].increment("".join([sid,pid]), 1) 
-            self.levels[0].increment(sid, 1) 
+            try:                                                          
+                #self.logger.debug("trying to set %s" % binascii.hexlify(full_key))
+                self.levels[-1].set(full_key, "") 
+                for i in range(0,len(self.levels)-1):             
+                    key = full_key[:((i+1)*self.keylength)]   
+                    self.levels[i].increment(key,1) 
+                #self.levels[1].increment("".join([sid,pid]), 1) 
+                #self.levels[0].increment(sid, 1)
+            except Exception, e:
+                self.logger.error("inserting triple/quad failed! %s" % str(triple)) 
+                print e 
             
         
     def __len__(self):
-        return self.levels[2].count() 
-    
+        return self.levels[-1].count() 
+     
+
     '''get the selectivity count'''    
-    def count(self, triple):
-        sid,pid,oid = triple
-        if (sid,pid,oid) == (None,None,None):
+    def selectivity_for_triple(self, triple):
+        #self.logger.debug("looking for selectivity for tuple: " + str(pp_tuple(triple)))
+        #empty tuple signals whole index
+        if triple == (None,) * len(triple):
             return len(self)
-        if sid is not None and pid is not None and oid is None:
-            if self.shared: #todo decorator
-                #get keys from level1 and then search level2
-                raise NotImplementedError("")
-            else:
-                return self.levels[1].increment( "".join([sid,pid]) , 0)             
-        elif sid is not None and pid is None and oid is None:
-            return self.levels[0].increment(sid, 0)
         else:
-            raise NotImplementedError("you tried to count something weird")    
+            triple_without_none = filter(lambda x: x != None, triple)
+            #the level is the lenght of the filtered triple - 1
+            #self.logger.debug("searching for key %s in index %i: " % (str(pp_tuple(triple_without_none)),len(triple_without_none)-1))
+            return self.levels[len(triple_without_none)-1].increment( "".join(triple_without_none),0)            
+        #if sid is not None and pid is not None and oid is None:
+        #    if self.shared: #todo decorator
+        #        #get keys from level1 and then search level2
+        #        raise NotImplementedError("")
+        #    else:
+        #        return self.levels[1].increment( "".join([sid,pid]) , 0)             
+        #elif sid is not None and pid is None and oid is None:
+        #    return self.levels[0].increment(sid, 0)
+        #else:
+        #    raise NotImplementedError("you tried to count something weird")    
              
 
                 
                 
                           
     def ids_for_triple(self,triple, num_records=-1):
-        sid,pid,oid = triple
+        #sid,pid,oid = triple
+        triple_without_none = filter(lambda x: x != None, triple) 
+        left_offset = len(triple_without_none) * self.keylength
+        return self.generator_for_searchstring_with_jump("".join(triple_without_none),loffset=left_offset,roffset=left_offset+self.keylength, num_records=num_records)
+        '''
         #subject and predicate given
         if sid is not None and pid is not None and oid is None:
             searchstring = "".join([sid,pid])               
@@ -112,7 +135,7 @@ class KVIndexTC(KVIndex):
                 return self.generator_for_searchstring_with_jump(searchstring,loffset=16,roffset=32, num_records=num_records)
         else:
             raise NotImplementedError("")                
-           
+       '''    
         
         
 #generators    
@@ -120,7 +143,7 @@ class KVIndexTC(KVIndex):
 
     def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=16, num_records=0):
         #print searchstring
-        cur = self.levels[2].cursor() 
+        cur = self.levels[-1].cursor() 
         cur.jump(searchstring)        
         while 1:
             try:
@@ -132,8 +155,8 @@ class KVIndexTC(KVIndex):
                 else: 
                     raise StopIteration                                           
             except KeyError:
-                #print "KeyError"
-                cur = self.levels[2].cursor()
+                self.logger.error("key error for: %s" % str(searchstring)) 
+                cur = self.levels[-1].cursor()
                 cur.jump(next)
                          
                                              

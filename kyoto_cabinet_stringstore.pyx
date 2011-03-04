@@ -1,0 +1,73 @@
+import kyotocabinet as kc
+import os
+from stringstore import Stringstore 
+import logging
+    
+class KyotoCabinetStringstore(Stringstore):
+    
+    def __init__(self, config_instance):
+        self.logger = logging.getLogger('KyotoCabinetStringstore')
+        self.logger.debug("init KyotoCabinetStringstore")
+        self.config_instance = config_instance                                                    
+        self.path = config_instance.get("database", "path")
+        self.db_name = config_instance.get("database", "stringstore")        
+        self.logger.debug("init KC Stringstore with cfg file:" + str(config_instance) + " path: " + self.path + " db_name: " + self.db_name)
+        super(KyotoCabinetStringstore, self).__init__(config_instance)
+        # setting new_id to counter or sha1_hexidgest_for according to the mode
+        self.db = kc.DB()
+        if eval(config_instance.get("general", "updateable")):
+            self.logger.debug("opening %s writeable" % os.path.join(self.path, self.db_name)) 
+            self.db.open(os.path.join(self.path, self.db_name), kc.DB.OCREATE | kc.DB.OWRITER)
+        else:
+            self.logger.debug("opening %s read only" % os.path.join(self.path, self.db_name))
+            self.db.open(os.path.join(self.path, self.db_name), kc.DB.OREADER) 
+        self.logger.debug("KyotoCabinetStringstore initialized")
+    
+    def __del__(self):
+        self.db.close()
+        
+    '''converts the id to the string'''   
+    def id2s(self, an_id):
+        return self.db.get(an_id)
+    
+    '''converts the string to the id'''    
+    def s2id(self,a_string):
+        if a_string is None: return None
+        an_id = self.get_new_id(a_string)
+        #if the id is not in the store we raise an exception b/c the query will be invalid
+        if (a_string is not None) and (an_id is None):
+            raise LookupError("Key not in Store!")
+        return an_id
+        
+    '''returns true if the string is in the store'''
+    def contains_string(self,string):
+        return string in self.db
+        
+                                
+    '''adds a string to the store and returns its id'''
+    def add_string(self,string):                    
+        key = self.s2id(string)
+        if key and self.db.set(key, string):
+            return key
+        else:
+            raise KeyError("String could not be added")
+     
+    def close(self):
+        self.db.close()
+           
+    '''in: tuple of s,p,o in ntriple format)     
+    out: tuple of keys 
+    
+    example for md5 keys:
+    in: ('<http://subject>', '<http://object>', '"literal"'
+    out :(hl.md5("<http://subject>").digest(), hl.md5("<http://object>").digest(), hl.md5('"literal"').digest()) ) 
+    raises an exception if one of the id's is not in the store (but not if any of the )
+    '''
+    def get_ids_from_tuple(self, triple):
+        keys = tuple(self.s2id(i) for i in triple)        
+        return keys       
+    
+    def get_strings_from_tuple(self, triple):
+        return tuple(self.id2s(i) for i in triple)
+        
+       
