@@ -11,7 +11,8 @@ class KVIndexKC(KVIndex):
     def __init__(self,config_file, name="spo"): 
         self.is_open = INDEX_CLOSED
         self.config_file = config_file          
-        self.path = os.path.abspath(self.config_file.get("database", "path"))        
+        self.path = os.path.abspath(self.config_file.get("database", "path")) 
+        self.db_config = config_file.get("kc", "indexconfig")       
         #self.internal_ordering = name
         #self.input_ordering = len(name)
         # hmm http://fuhm.net/super-harmful/
@@ -28,7 +29,7 @@ class KVIndexKC(KVIndex):
             return INDEX_OPEN
         for lvl in range(0,3):
              bdb = kc.DB()                           
-             fullpath = os.path.join(self.path, "%s%s.kct" % (self.filename_prefix, str(lvl))) 
+             fullpath = os.path.join(self.path, "%s%s.kct%s" % (self.filename_prefix, str(lvl),  self.db_config )) 
              self.logger.debug("opening: " + os.path.join(self.path, "%s%s.kct" % (self.filename_prefix, str(lvl))))  
              #open all indexes according to the config either read only or updateable
              if eval(self.config_file.get("general","updateable")):
@@ -151,14 +152,27 @@ class KVIndexKC(KVIndex):
                 if next[0:loffset] == (searchstring):
                     jumpto = yield(next[loffset:roffset])
                     if jumpto:
-                        cur.jump("".join((searchstring, jumpto)))
-                else: 
+                        cur.jump("".join((searchstring, jumpto)))                 
+                else:  
+                    #
+                    # self.logger.debug("generator exhausted")
                     raise StopIteration                                           
             except KeyError:
                 self.logger.error("key error for: %s" % str(searchstring)) 
                 cur = self.levels[-1].cursor()
                 cur.jump(next)
                          
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
                                              
   
                                                     

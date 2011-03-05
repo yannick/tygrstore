@@ -10,14 +10,15 @@ class KyotoCabinetStringstore(Stringstore):
         self.logger.debug("init KyotoCabinetStringstore")
         self.config_instance = config_instance                                                    
         self.path = config_instance.get("database", "path")
-        self.db_name = config_instance.get("database", "stringstore")        
+        self.db_name = config_instance.get("database", "stringstore")
+        self.db_config = config_instance.get("kc", "stringstoreconfig")        
         self.logger.debug("init KC Stringstore with cfg file:" + str(config_instance) + " path: " + self.path + " db_name: " + self.db_name)
         super(KyotoCabinetStringstore, self).__init__(config_instance)
         # setting new_id to counter or sha1_hexidgest_for according to the mode
         self.db = kc.DB()
         if eval(config_instance.get("general", "updateable")):
             self.logger.debug("opening %s writeable" % os.path.join(self.path, self.db_name)) 
-            self.db.open(os.path.join(self.path, self.db_name), kc.DB.OCREATE | kc.DB.OWRITER)
+            self.db.open(os.path.join(self.path, self.db_name + self.db_config), kc.DB.OCREATE | kc.DB.OWRITER)
         else:
             self.logger.debug("opening %s read only" % os.path.join(self.path, self.db_name))
             self.db.open(os.path.join(self.path, self.db_name), kc.DB.OREADER) 

@@ -23,3 +23,6 @@ class Stringstore(object):
     '''return the next int'''    
     def counter(self, string):
         return str(self.s2id.addint("counter", 1))
+        
+    def __del__(self):
+        self.close()

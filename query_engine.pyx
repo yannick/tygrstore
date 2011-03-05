@@ -39,7 +39,7 @@ class ResultSet(object):
     def unresolve(self, var):
         for triple in self.triples:
             triple.unresolve(var)
-        self.unsolved_variables.insert(0,var)        
+        self.unsolved_variables.append(var)        
         self.solutions[var] = None
             
     def __str__(self):
@@ -47,11 +47,9 @@ class ResultSet(object):
            
 class Triple(object):
     def __init__(self,cysparql_triple):
-        #import pdb; pdb.set_trace()
-        self.ids = list(cysparql_triple.as_id_tuple()) #self.stringstore.get_ids_from_tuple( cysparql_triple.n3(withvars=False) )
+        self.ids = list(cysparql_triple.as_id_tuple()) 
         self.variables = list(cysparql_triple.variables)
         self.variables_tuple = cysparql_triple.as_var_tuple()
-        print str(self.variables)
         self.n3 = cysparql_triple.n3(withvars=False)
         self.unsolved_variables = list(self.variables)
         self.selectivity = cysparql_triple.selectivity
@@ -66,7 +64,7 @@ class Triple(object):
     
     def unresolve(self,var):
         if self.variables.count(var) > 0:
-            self.unsolved_variables.insert(0,var)
+            self.unsolved_variables.append(var)
             self.ids[self.variables_tuple.index(var)] = None   
     
     def ids_as_tuple(self):
@@ -79,9 +77,10 @@ class QueryEngine(object):
         self.stringstore = stringstore
         self.index_manager = index_manager
         self.logger = logging.getLogger("tygrstore.query_engine")
-        self.config = config_file
+        self.config = config_file 
+        self.jump_btree = self.config.getboolean("index", "jump_btree")
     
-    def execute2(self, query):
+    def execute(self, query):
         #parse the query
         self.sparql_query = sparql.Query(query)
          
@@ -89,79 +88,76 @@ class QueryEngine(object):
         
         triples = []    
         
-        current_gp = self.sparql_query.graph_pattern
+        #TODO: set together the different graph patterns and execute their code in paralell
+        current_gp = self.sparql_query.graph_pattern                                       
+        
+        
         #encode and set selectivity  
         self.logger.debug("encoding triples and get selectivities")
         for triple in current_gp:
             #encode triples 
-            #self.logger.debug("using triple %s %s %s" % triple.n3(withvars=True))
-            ids = self.stringstore.get_ids_from_tuple( triple.n3(withvars=False) )
-            #self.logger.debug("spo triple %s,%s,%s" % (triple.s.value, triple.p.value, triple.o.value)) 
-            triple.encode(ids[0],ids[1],ids[2], numeric=eval(self.config.get("general", "numeric_ids")))
-            #get selectivities 
-            sel = self.index_manager.selectivity_for_tuple(ids)
-            self.logger.debug("got selectivity of %s" % sel)
-            triple.selectivity = sel    
+            ids = self.stringstore.get_ids_from_tuple( triple.n3(withvars=False) ) 
+            triple.encode(ids[0],ids[1],ids[2], numeric=eval(self.config.get("general", "numeric_ids"))) 
+            
+            #get selectivity 
+            sel = self.index_manager.selectivity_for_tuple(ids)            
+            triple.selectivity = sel
+            self.logger.debug("got selectivity of %s for tuple %s" % (sel,triple.n3(withvars=True)))
+                 
             #create a new Triple object and add it to all triples
             triples.append(Triple(triple))   
             
-        #put all variables into a dict
-        #old self.empty_result_set = dict( (var.name, None) for var in self.sparql_query.vars)
-        #self.logger.debug("sorting by selectivity")    
-        triples = sorted(triples, key=lambda a_triple: a_triple.selectivity) 
-        #import pdb; pdb.set_trace()    
+
+        #sort triples by selectivity
+        triples = sorted(triples, key=lambda a_triple: a_triple.selectivity)  
+        
+        #generate an empty result set
         empty_result_set = ResultSet([var.name for var in self.sparql_query.vars], triples)   
             
                 
+       
+        #get the first variable we want to solve
+        firstvar = empty_result_set.triples[0].variables[-1] 
         
-        firstvar = empty_result_set.triples[0].variables[0]
-        #self.logger.debug("choosing %s as first variable to solve" % firstvar)
-        #empty_result_set = dict([(var.name,None) for var in self.sparql_query.vars])
-        #self.logger.debug("calling evaluate2 with " + str(empty_result_set) + "firstvar: " + firstvar + " triples: " + str(triples))   
-        for res in self.evaluate2(empty_result_set, firstvar):             
-            yield self.id2s_hash(res)
+        #for debugging 
+        self.recursionsteps = 0
+        self.checkvar = ""
+        self.logger.debug("got the following variables: %s and using %s as the first" % (str(empty_result_set.unsolved_variables),firstvar))  
+        
+        #generator which yields the actual results as hash 
+        for res in self.evaluate(empty_result_set, firstvar):             
+            yield (self.id2s_hash(res), self.recursionsteps)  
+        
                 
     '''the recursively called evaluate function'''    
-    def evaluate2(self, result_set, var):
-        #self.logger.debug("evaluate2 for var " + str(var) + " and triples: " + str(result_set.triples_with_var(var)))  
-        #self.logger.debug("----solutions: " + str(result_set.solutions)   + "\n-----") 
-        #if var == "x":
-        #    import pdb; pdb.set_trace()
-        #TODO: OPTIMIZE, a lot of time is lost here   
-        #if there are no unsolved variables then return a result set
-        #this could be moved down the line to save a recursion step
-        #if len(result_set.unsolved_variables) == 0:
-        #    self.logger.debug("FOUND RESULTS!")
-        #    yield result_set.solutions
-        #else:
+    def evaluate(self, result_set, var):
+        if (var != self.checkvar): 
+            self.logger.debug("solving variable: " + var)
+            self.checkvar = var
+        
         #we need only the triples which contain the unbound variable we search  
-        # triple.n3(withvars=False)
-        #triples_with_var = [triple.as_id_tuple() for triple in triples if (var in triple.variables)]
         triples_with_var = result_set.triples_with_var(var) 
       
         #we then join all the resulting id's                                                        
-        for an_id in self.mergejoin_ids(triples_with_var, var):                                          
-            #import pdb; pdb.set_trace()                                                                         
+        for an_id in self.mergejoin_ids(triples_with_var, var):                                                                                                             
             #set the var as solved                                                                  
             result_set.resolve(var, an_id) 
-            next_var = None
+            next_var = None                                                                    
+            
+            #if we have unsolved variables go a recursion step deeper, otherwise yield a result
             if len(result_set.unsolved_variables) > 0:                                                        
-                next_var =  result_set.unsolved_variables[0]                                                  
-                #print "recursion ++ with new var %s" % next_var
-                #self.logger.debug("recursion ++ with new var %s" % next_var)
-                for res in self.evaluate2(result_set, next_var):                                    
-                    yield res                                                                           
-                #self.logger.debug("recursion --")                                                                  
+                next_var =  result_set.unsolved_variables[-1]                                                  
+                
+                #recursive call!
+                for res in self.evaluate(result_set, next_var):                                    
+                    yield res                                                                    
                 #unset the just solved var                                                              
                 result_set.unresolve(var)
             else:
-                 #self.logger.debug("FOUND RESULTS!")
-                 #self.logger.debug("----solutions: " + str(result_set.solutions)   + "\n-----")                  
-                 yield result_set.solutions
-                 #import pdb; pdb.set_trace() 
-                 result_set.unresolve(var)
-                 #
-                 # self.logger.debug("UNRESOLVE %s" % var)
+                #we found a result                
+                yield result_set.solutions
+                result_set.unresolve(var)
+        
  
     def id2s_hash(self, solution):
         return dict( (k, self.stringstore.id2s(v)) for k,v in solution.iteritems())
@@ -193,12 +189,14 @@ class QueryEngine(object):
     
     
     def multi_merge_join(self, generators):
-        #generators = list(generators)
-        
+        #generators = list(generators)        
         result = generators.pop()
-        
-        while len(generators) > 0:
-            result = self.merge_join(result, generators.pop())
+        if self.jump_btree:
+            while len(generators) > 0:
+                result = self.merge_join_with_jump(result, generators.pop())
+        else:
+            while len(generators) > 0:
+                result = self.merge_join(result, generators.pop()) 
         return result
             
     
@@ -226,15 +224,17 @@ class QueryEngine(object):
                 right = right_generator.send(left)
                 
     def merge_join_with_jump(self, left_generator, right_generator):
-        raise NotImplemented()
+        #raise NotImplemented()
         left = left_generator.next()
         right = right_generator.next()                               
         while left_generator and right_generator:
             comparison = cmp(right, left)
-            if comparison == 0:                
+            if comparison == 0:
+                #self.logger.debug("found result %s" % self.stringstore.id2s(left))                
                 yield left
                 left = left_generator.next()
-                right = right_generator.next()  
+                right = right_generator.next()
+                #self.logger.debug("ok")  
             elif comparison > 0:
                 left = left_generator.send(right)
             else:

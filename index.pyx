@@ -10,9 +10,11 @@ import logging
 class KVIndex(object):
 
  
-    def __init__(self, keylength=20):
-        self.logger = logging.getLogger("tygrstore.index")
-        self.keylength = keylength        
+    def __init__(self, opts, name):
+        self.internal_ordering = name
+        self.input_ordering = opts.get("database", "naturals")
+        self.keylength = int(opts.get("index", "keylength"))
+        self.logger = logging.getLogger("tygrstore.index")     
         self.setup_reordering_decorators()
         
     
@@ -28,7 +30,7 @@ class KVIndex(object):
         self.logger.info("reordering: %s" % str(self.reordering))      
         self.ids_for_triple = self.input_reorder_wrapper(self.ids_for_triple) 
         self.add_triple = self.input_reorder_wrapper(self.add_triple)
-        self.count = self.input_reorder_wrapper(self.count)
+        self.selectivity_for_triple = self.input_reorder_wrapper(self.selectivity_for_triple)
         
          
     def input_reorder_wrapper(self, original_func):
@@ -98,7 +100,7 @@ class KVIndexRedis(KVIndex):
         return self.levels[1].dbsize() 
         
         
-    def count(self, triple):
+    def selectivity_for_triple(self, triple):
         sid,pid,oid = triple
 
         if (sid,pid,oid) == (None,None,None):
@@ -186,7 +188,7 @@ class KVIndexTC(KVIndex):
         '''deletes all databases'''
         close = self.close()
         if (close != INDEX_CLOSED):
-            raise
+            raise BaseException("could not close index")
         for i in range(0,3):
             filen = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
             #unlink/delete not working, why??? 
@@ -198,7 +200,7 @@ class KVIndexTC(KVIndex):
         full_key = "".join(triple)
         #check if its already in there   
         if self.levels[2].has_key(full_key):            
-            self.logger.debug("triple already in the store: %s" % str(triple)) 
+            self.logger.error("triple already in the store: %s" % str(triple)) 
         else:
             self.levels[2].put(full_key, "") 
             self.levels[1].addint("".join([sid,pid]), 1) 
@@ -209,7 +211,7 @@ class KVIndexTC(KVIndex):
         return len(self.levels[2]) 
     
     '''get the selectivity count'''    
-    def count(self, triple):
+    def selectivity_for_triple(self, triple):
         sid,pid,oid = triple
         if (sid,pid,oid) == (None,None,None):
             return len(self)
