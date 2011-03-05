@@ -47,7 +47,7 @@ def flush_s2id(s2id_tree, s2id_config, dirpath, filename, filenumber):
     s2id_tree.close()
     del(s2id_tree)
     s2id_tree = kc.DB()  #rbtree.rbtree() 
-    filename = os.path.join(dirpath, "id2s." + str(filenumber) + ".kct")
+    filename = os.path.join(dirpath, "id2s." + str(filenumber) + ".kch")
     s2id_tree.open(filename + s2id_config, kc.DB.OWRITER | kc.DB.OCREATE)
     print "done"
     return s2id_tree
@@ -101,7 +101,7 @@ def process(hashf, options):
         heaps[p] = []
         
     s2id_tree = kc.DB()  #rbtree.rbtree() 
-    filename = os.path.join(dirpath, "id2s.0.kct")
+    filename = os.path.join(dirpath, "id2s.0.kch")
     s2id_tree.open(filename + s2id_config, kc.DB.OWRITER | kc.DB.OCREATE)
     #s2id_tree.open('%#bnum=1000k#psiz=65536#pccap=32m#opts=c', kc.DB.OWRITER | kc.DB.OCREATE)        
 
@@ -188,10 +188,10 @@ def main():
                       help='the key length in bytes')
     parser.add_option('-p','--path', type='string',
                    action='store', dest='path', default=".",
-                   help='the key length in bytes')
+                   help='the output path')
     parser.add_option('-s','--size', type='long',
                     action='store', dest='inmemory_size', default=1000000,
-                    help='the number of keys that should be cached until the id2string file is flushed to disk')                         
+                    help='the number of keys/triples that should be cached until the id2string file is flushed to disk. (default:1000000)')                         
                                            
     (options, args) = parser.parse_args()
 #    if len(args) != 3:
