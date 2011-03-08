@@ -41,34 +41,25 @@ class KyotoCabinetStringstore(Stringstore):
         return an_id
         
     '''returns true if the string is in the store'''
-    def contains_string(self,string):
-        return string in self.db
+    def contains_string(self,a_string):
+        return a_string in self.db
         
                                 
     '''adds a string to the store and returns its id'''
-    def add_string(self,string):                    
-        key = self.s2id(string)
-        if key and self.db.set(key, string):
+    def add_string(self,a_string):                    
+        key = self.s2id(a_string)
+        if key and self.db.set(key, a_string):
             return key
         else:
             raise KeyError("String could not be added")
-     
+    
+    def next_id(self):
+        pass
+         
     def close(self):
         self.db.close()
            
-    '''in: tuple of s,p,o in ntriple format)     
-    out: tuple of keys 
-    
-    example for md5 keys:
-    in: ('<http://subject>', '<http://object>', '"literal"'
-    out :(hl.md5("<http://subject>").digest(), hl.md5("<http://object>").digest(), hl.md5('"literal"').digest()) ) 
-    raises an exception if one of the id's is not in the store (but not if any of the )
-    '''
-    def get_ids_from_tuple(self, triple):
-        keys = tuple(self.s2id(i) for i in triple)        
-        return keys       
-    
-    def get_strings_from_tuple(self, triple):
-        return tuple(self.id2s(i) for i in triple)
+    def __len__():
+        return len(self.db)
         
        
