@@ -50,8 +50,8 @@ import hashlib
 class Sink(object):
    def __init__(self):
       self.length = 0
-      out_path = "/Volumes/data/databases/temp_sha1"
-      s2id = os.path.join(out_path, "id2s.kch#bnum=1M#opts=l")
+      out_path = "/Volumes/data/databases/temp_sha1/"
+      s2id = os.path.join(out_path, "id2s.kch#bnum=1000M#opts=l")
       self.s2id = kc.DB()
       self.s2id.open(s2id, kc.DB.OWRITER | kc.DB.OCREATE)
       self.spo = open(os.path.join(out_path, "spo.txt"),'w') 
