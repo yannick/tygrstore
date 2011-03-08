@@ -89,12 +89,7 @@ class IndexManager(object):
     
     def __len__(self):
         return len(self.unique_indexes[0])                                           
-#index         
-    def string2id(self):
-        pass
-        
-    def id2string(self):
-        pass
+
                  
     def __del__(self):
         self.logger.debug("closing all indexes")

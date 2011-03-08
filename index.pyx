@@ -14,7 +14,8 @@ class KVIndex(object):
         self.internal_ordering = name
         self.input_ordering = opts.get("database", "naturals")
         self.keylength = int(opts.get("index", "keylength"))
-        self.logger = logging.getLogger("tygrstore.index")     
+        self.logger = logging.getLogger("tygrstore.index") 
+        self.updateable = self.config_file.get("general","updateable")    
         self.setup_reordering_decorators()
         
     
@@ -78,7 +79,7 @@ class KVIndexRedis(KVIndex):
         self.is_open = INDEX_OPEN    
 
     def close(self):
-        raise NotImplementedError("not implemented!")
+        pass
     
     def add_triple(self, triple):
         '''adds a triple. 
@@ -134,208 +135,6 @@ class KVIndexRedis(KVIndex):
             raise NotImplementedError("")
                     
                                 
-import os                         
-from tc import *
-'''represents a Tokyo Cabinet backed spo-type index'''
-class KVIndexTC(KVIndex):
-    #TODO: add quad support
-    
-    def __init__(self, name="spo", path="./data_lubm/", keylength=20 ):
-        self.name = name  
-        self.internal_ordering = name
-        self.input_ordering = "spo"
-        # hmm http://fuhm.net/super-harmful/
-        super(KVIndexTC, self).__init__(keylength=keylength)
-        self.path = os.path.abspath(path)
-        self.is_open = INDEX_CLOSED
-        self.levels = [] #todo use list
-        
-        self.filename_prefix = name
-        self.is_open = self.open()
-        self.shared = False
-     
-# tygrstore api methods
-    def open(self):
-        if self.is_open == INDEX_OPEN:
-            return INDEX_OPEN
-        for i in range(0,3):
-             bdb = BDB() 
-             #tuning?             
-             fullpath = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
-             #print fullpath 
-             #bdb.tcbdbtune(bdb, 256, 512, 32000000, -1, -1, BDBTLARGE)
-             # int32_t lmemb, int32_t nmemb, int64_t bnum, int8_t apow, int8_t fpow, uint8_t opts
-             #bdb.tcbdbsetxmsiz(bdb, 1024*1024*1024*20)
-             bdb.open(fullpath, BDBOWRITER | BDBOREADER | BDBOCREAT )    #BDBOWRITER | BDBOREADER | BDBOCREAT  
-             #bdb.tcbdbtune(bdb, 256, 512, 32000000, -1, -1, ctokyo.BDBTLARGE)
-             #bdb.tcbdbsetxmsiz(bdb, 1024*1024*1024*20)
-             
-             self.levels.append(bdb)          
-        self.is_open = INDEX_OPEN
-        return self.is_open  
 
-
-
-    def close(self):
-        if self.is_open == INDEX_CLOSED:
-            return INDEX_CLOSED       
-        for f in self.levels:
-            f.close()
-        self.is_open = INDEX_CLOSED
-        return INDEX_CLOSED
-
-    def delete(self):
-        '''deletes all databases'''
-        close = self.close()
-        if (close != INDEX_CLOSED):
-            raise BaseException("could not close index")
-        for i in range(0,3):
-            filen = os.path.join(self.path, "%s%s.bdb" % (self.filename_prefix, str(i)))
-            #unlink/delete not working, why??? 
-            os.unlink( filen )
-            
-        
-    def add_triple(self, triple):
-        sid,pid,oid = triple   
-        full_key = "".join(triple)
-        #check if its already in there   
-        if self.levels[2].has_key(full_key):            
-            self.logger.error("triple already in the store: %s" % str(triple)) 
-        else:
-            self.levels[2].put(full_key, "") 
-            self.levels[1].addint("".join([sid,pid]), 1) 
-            self.levels[0].addint(sid, 1) 
-            
-        
-    def __len__(self):
-        return len(self.levels[2]) 
-    
-    '''get the selectivity count'''    
-    def selectivity_for_triple(self, triple):
-        sid,pid,oid = triple
-        if (sid,pid,oid) == (None,None,None):
-            return len(self)
-        if sid is not None and pid is not None and oid is None:
-            if self.shared: #todo decorator
-                #get keys from level1 and then search level2
-                raise NotImplementedError("")
-            else:
-                return self.levels[1].addint( "".join([sid,pid]) , 0)             
-        elif sid is not None and pid is None and oid is None:
-            return self.levels[0].addint(sid, 0)
-        else:
-            raise NotImplementedError("you tried to count something weird")    
-             
-
-                
-                
-                          
-    def ids_for_triple(self,triple, num_records=-1):
-        sid,pid,oid = triple
-        #subject and predicate given
-        if sid is not None and pid is not None and oid is None:
-            searchstring = "".join([sid,pid])               
-            return self.generator_for_searchstring_with_jump(searchstring,loffset=40,roffset=60, num_records=num_records)
-            #search in level2 
-        #only subject given
-        elif sid is not None and pid is None and oid is None:
-            searchstring = sid
-            
-            if self.shared:
-                #get keys from level1 and then search level2
-                raise NotImplemented("")
-            else:
-                return self.generator_for_searchstring_with_jump(searchstring,loffset=20,roffset=40, num_records=num_records)
-        else:
-            raise NotImplementedError("")                
-           
-        
-        
-#generators    
-
-    def generator_for_searchstring(self,searchstring,loffset=0,roffset=20,num_records=-1):
-        #print searchstring
-        cur = self.levels[2].curnew()
-        cur.jump(searchstring)
-        #fixed number of records, this is slower! why?!!????? 
-        if num_records > 0:
-            while num_records > 0:
-                next = cur.next() 
-                # todo: speedup
-                try:                        
-                    yield next[loffset:roffset]
-                    num_records -= 1     
-                except KeyError:
-                    raise StopIteration 
-        #unknown number of records, always check and receive comaparison penalty
-        else:   
-            while 1:
-                next = cur.next() 
-                # todo: speedup
-                try:
-                    if next[0:loffset] == (searchstring):
-                        yield next[loffset:roffset]
-                    else: 
-                        raise StopIteration
-                except KeyError:
-                    raise StopIteration             
-
-    def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=20, num_records=0):
-        #print searchstring
-        cur = self.levels[2].curnew() 
-        cur.jump(searchstring)        
-        while 1:
-            try:
-                next = cur.next()
-                if next[0:loffset] == (searchstring):
-                    jumpto = yield(next[loffset:roffset])
-                    if jumpto:
-                        cur.jump("".join((searchstring, jumpto)))
-                else: 
-                    raise StopIteration                                           
-            except KeyError:
-                #print "KeyError"
-                cur = self.levels[2].curnew()
-                cur.jump(next)
-                         
-                                             
-  
-                                                    
-    #untested, POC
-    def chunk_generator_for_searchstring(self,searchstring, chunksize):
-        cur = self.levels[2].curnew()
-        cur.jump(searchstring)
-        while 1:
-            next = cur.next() #why cant that be in the while clause... 
-            list_of_ids = []
-            top = chunksize
-            while top > 0:
-                top -= 1 
-                if next.startswith(searchstring):
-                    list_of_ids.append(next)
-                    
-                else:
-                    if len(list_of_ids) > 0:
-                        yield list_of_ids
-                    else: 
-                        raise StopIteration
-        yield list_of_ids   
-                                    
-        
-   
-                                           
-    
-                           
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         
         

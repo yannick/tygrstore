@@ -3,18 +3,17 @@ import kyotocabinet as kc
 import binascii
 import logging
 from index import *
-from helpers import *
+from helpers import *   
+
 '''represents a Kyoto Cabinet backed spo-type index'''
 class KVIndexKC(KVIndex):
-    #TODO: add quad support
-    
+   
     def __init__(self,config_file, name="spo"): 
         self.is_open = INDEX_CLOSED
         self.config_file = config_file          
         self.path = os.path.abspath(self.config_file.get("database", "path")) 
         self.db_config = config_file.get("kc", "indexconfig")       
-        #self.internal_ordering = name
-        #self.input_ordering = len(name)
+        
         # hmm http://fuhm.net/super-harmful/
         #setup_reordering_decorators and set keylength
         super(KVIndexKC, self).__init__(self.config_file,name)                
@@ -27,12 +26,12 @@ class KVIndexKC(KVIndex):
     def open(self):
         if self.is_open == INDEX_OPEN:
             return INDEX_OPEN
-        for lvl in range(0,3):
+        for lvl in range(0,len(self.internal_ordering)):
              bdb = kc.DB()                           
              fullpath = os.path.join(self.path, "%s%s.kct%s" % (self.filename_prefix, str(lvl),  self.db_config )) 
              self.logger.debug("opening: " + os.path.join(self.path, "%s%s.kct" % (self.filename_prefix, str(lvl))))  
              #open all indexes according to the config either read only or updateable
-             if eval(self.config_file.get("general","updateable")):
+             if eval(self.updateable):
                  rw_opts = kc.DB.OCREATE | kc.DB.OWRITER
              else:
                  rw_opts = kc.DB.OREADER
@@ -90,53 +89,18 @@ class KVIndexKC(KVIndex):
 
     '''get the selectivity count'''    
     def selectivity_for_triple(self, triple):
-        #self.logger.debug("looking for selectivity for tuple: " + str(pp_tuple(triple)))
-        #empty tuple signals whole index
         if triple == (None,) * len(triple):
             return len(self)
         else:
             triple_without_none = filter(lambda x: x != None, triple)
-            #the level is the lenght of the filtered triple - 1
-            #self.logger.debug("searching for key %s in index %i: " % (str(pp_tuple(triple_without_none)),len(triple_without_none)-1))
             return self.levels[len(triple_without_none)-1].increment( "".join(triple_without_none),0)            
-        #if sid is not None and pid is not None and oid is None:
-        #    if self.shared: #todo decorator
-        #        #get keys from level1 and then search level2
-        #        raise NotImplementedError("")
-        #    else:
-        #        return self.levels[1].increment( "".join([sid,pid]) , 0)             
-        #elif sid is not None and pid is None and oid is None:
-        #    return self.levels[0].increment(sid, 0)
-        #else:
-        #    raise NotImplementedError("you tried to count something weird")    
-             
-
-                
-                
+                            
                           
     def ids_for_triple(self,triple, num_records=-1):
         #sid,pid,oid = triple
         triple_without_none = filter(lambda x: x != None, triple) 
         left_offset = len(triple_without_none) * self.keylength
         return self.generator_for_searchstring_with_jump("".join(triple_without_none),loffset=left_offset,roffset=left_offset+self.keylength, num_records=num_records)
-        '''
-        #subject and predicate given
-        if sid is not None and pid is not None and oid is None:
-            searchstring = "".join([sid,pid])               
-            return self.generator_for_searchstring_with_jump(searchstring,loffset=32,roffset=48, num_records=num_records)
-            #search in level2 
-        #only subject given
-        elif sid is not None and pid is None and oid is None:
-            searchstring = sid
-            
-            if self.shared:
-                #get keys from level1 and then search level2
-                raise NotImplemented("")
-            else:
-                return self.generator_for_searchstring_with_jump(searchstring,loffset=16,roffset=32, num_records=num_records)
-        else:
-            raise NotImplementedError("")                
-       '''    
         
         
 #generators    
