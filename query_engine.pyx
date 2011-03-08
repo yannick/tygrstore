@@ -83,14 +83,11 @@ class QueryEngine(object):
     def execute(self, query):
         #parse the query
         self.sparql_query = sparql.Query(query)
-         
-
-        
+               
         triples = []    
         
         #TODO: set together the different graph patterns and execute their code in paralell
         current_gp = self.sparql_query.graph_pattern                                       
-        
         
         #encode and set selectivity  
         self.logger.debug("encoding triples and get selectivities")
@@ -123,7 +120,7 @@ class QueryEngine(object):
         self.recursionsteps = 0
         self.checkvar = ""
         self.logger.debug("got the following variables: %s and using %s as the first" % (str(empty_result_set.unsolved_variables),firstvar))  
-        
+
         #generator which yields the actual results as hash 
         for res in self.evaluate(empty_result_set, firstvar):             
             yield (self.id2s_hash(res), self.recursionsteps)  
@@ -131,9 +128,11 @@ class QueryEngine(object):
                 
     '''the recursively called evaluate function'''    
     def evaluate(self, result_set, var):
-        if (var != self.checkvar): 
-            self.logger.debug("solving variable: " + var)
-            self.checkvar = var
+        #if (var != self.checkvar): 
+        #    self.logger.debug("solving variable: " + var)
+        #    self.checkvar = var
+         
+        #TODO: check if only 1 triple in BGP
         
         #we need only the triples which contain the unbound variable we search  
         triples_with_var = result_set.triples_with_var(var) 
@@ -200,14 +199,13 @@ class QueryEngine(object):
         return result
             
     
+    #todo: remove jumping
     def merge_join(self, left_generator, right_generator):
         #cdef char* left
         #cdef char* righ  
         
         left = left_generator.next()
         right = right_generator.next()
-        #print "left:  %s" % binascii.hexlify(left)
-        #print "right: %s" % binascii.hexlify(right)
         while left_generator and right_generator:
             #self.logger.debug("comparing: %s to %s" % (self.stringstore.id2s(left), self.stringstore.id2s(right)))
             comparison = cmp(right, left)
@@ -224,54 +222,19 @@ class QueryEngine(object):
                 right = right_generator.send(left)
                 
     def merge_join_with_jump(self, left_generator, right_generator):
-        #raise NotImplemented()
         left = left_generator.next()
         right = right_generator.next()                               
         while left_generator and right_generator:
             comparison = cmp(right, left)
-            if comparison == 0:
-                #self.logger.debug("found result %s" % self.stringstore.id2s(left))                
+            if comparison == 0:                
                 yield left
                 left = left_generator.next()
-                right = right_generator.next()
-                #self.logger.debug("ok")  
+                right = right_generator.next() 
             elif comparison > 0:
                 left = left_generator.send(right)
             else:
                 right = right_generator.send(left) 
             
     
-    #old 
-    '''replace strings by ids from the stringstore'''       
-    def encode_triples(self,triples):
-        for triple in triples:                                                     
-            #parse the roqet triple to get string or none, replace the string by id and yield a tuple
-            yield tuple(self.stringstore.add_generator(self.parse_roqet_triple(triple)))
-     
-    def encode_query(self):
-        for triple in self.sparql_query:
-            triple.encoded = self.stringstore.get_ids_from_tuple(triple.tuple_of_strings)
-    
-    '''contstruct a tuple of None and Strings
-    
-    eg.
-    (('var', 'x'), ('uri', 'http://mytunes.org/music#artist'),('var', 'y'))
-    becomes 
-    (None, 'e8de31555c5b36e6933cccb02eaa99126b6cabe7', None)
-    '''    
-    def parse_roqet_triple(self, triple):
-        for tup in triple:
-            if tup[0] == 'var':
-                yield None            
-            elif tup[0] in ('literal','uri'):
-                yield tup[1]
-            else:
-                raise Exception("we only support variables, literals and uris for now, so no %s" % tup[0])
-                                         
-            
-    def parse(self, query):
-        try:
-            return roqet.sparql(query)
-        except:
-            self.logger.error("roqet could not parse the query!")
+
     
