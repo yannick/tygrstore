@@ -2,6 +2,7 @@
 from index import *
 from indexkc import *
 from indextc import *
+from indexmongo import *
 from itertools import *
 import logging
 from helpers import * 
@@ -14,6 +15,7 @@ class IndexManager(object):
         self.logger = logging.getLogger('IndexManager')
         self.logger.debug("init IndexManager")
         self.config = config
+        self.update_only_one = self.config.getboolean("index_manager", "update_only_one")
         self.index_class = eval(self.config.get("index", "type"))
         self.logger.debug("using index types of class" + str(self.index_class))
         path = os.path.abspath(self.config.get("database", "path"))        
@@ -75,13 +77,19 @@ class IndexManager(object):
         return self.index_for_tuple(triple).selectivity_for_triple(triple)
     
     def add_to_all_indexes(self, triple):
-        for idx in self.unique_indexes:
-            idx.add_triple(triple)  
+        if self.update_only_one:
+            self.unique_indexes[0].add_triple(triple)
+        else:
+            for idx in self.unique_indexes:
+                idx.add_triple(triple)  
     
     #here we need to make sure, that var is actually the var which is being resolved
     def ids_for_ttriple(self, ttriple, var): 
-        #import pdb; pdb.set_trace()        
-        return self.index_for_ttriple(ttriple,var).ids_for_triple(ttriple.ids_as_tuple())
+        #import pdb; pdb.set_trace()
+        snatural = None 
+        if self.update_only_one:  
+            snatural = self.naturals[ttriple.variables_tuple.index(var)]    
+        return self.index_for_ttriple(ttriple,var).ids_for_triple(ttriple.ids_as_tuple(), searched_natural=snatural)
                 
     def close(self):
         for idx in self.unique_indexes:

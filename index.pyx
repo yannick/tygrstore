@@ -10,13 +10,13 @@ import logging
 class KVIndex(object):
 
  
-    def __init__(self, opts, name):
+    def __init__(self, opts, name, reorder=True):
         self.internal_ordering = name
         self.input_ordering = opts.get("database", "naturals")
         self.keylength = int(opts.get("index", "keylength"))
         self.logger = logging.getLogger("tygrstore.index") 
         self.updateable = self.config_file.get("general","updateable")    
-        self.setup_reordering_decorators()
+        if reorder: self.setup_reordering_decorators()
         
     
     '''here we change the input and output of 

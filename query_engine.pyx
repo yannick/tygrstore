@@ -112,7 +112,7 @@ class QueryEngine(object):
         empty_result_set = ResultSet([var.name for var in self.sparql_query.vars], triples)   
             
                 
-       
+        #import pdb; pdb.set_trace() 
         #get the first variable we want to solve
         firstvar = empty_result_set.triples[0].variables[-1] 
         
