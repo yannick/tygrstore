@@ -33,12 +33,12 @@ class Stringstore(object):
                                     
     '''returns true if the string is in the store'''
     def contains_string(self,a_str):
-        if self.s2id(a_str): return true
-        return false
+        if self.s2id(a_str): return True
+        return False
     
-    def get_or_add_string(a_string):
+    def get_or_add_string(self,a_string):
         if self.contains_string(a_string):
-            return s2id(a_string)
+            return self.s2id(a_string)
         else:
             return self.add_string(a_string)
             

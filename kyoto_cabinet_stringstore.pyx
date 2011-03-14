@@ -62,7 +62,7 @@ class KyotoCabinetStringstore(Stringstore):
     def close(self):
         self.db.close()
            
-    def __len__():
+    def __len__(self):
         return len(self.db)
         
        
