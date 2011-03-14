@@ -26,7 +26,10 @@ class KyotoCabinetStringstore(Stringstore):
     
     def __del__(self):
         self.db.close()
-        
+    
+    def counter(self):
+        pass
+           
     '''converts the id to the string'''   
     def id2s(self, an_id):
         return self.db.get(an_id)

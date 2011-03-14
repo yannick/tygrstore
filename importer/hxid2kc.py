@@ -36,9 +36,9 @@ def main():
     lvl0 = kc.DB()
     lvl1 = kc.DB()
     lvl2 = kc.DB()
-    lvl0.open(options.outfile + '0.kct#bnum=12M#psiz=128k#pccap=128M#opts=l', kc.DB.OWRITER | kc.DB.OCREATE)
-    lvl1.open(options.outfile + '1.kct#bnum=12M#psiz=128k#pccap=128M#opts=l', kc.DB.OWRITER | kc.DB.OCREATE)
-    lvl2.open(options.outfile + '2.kct#bnum=12M#psiz=128k#pccap=128M#opts=l', kc.DB.OWRITER | kc.DB.OCREATE)
+    lvl0.open(options.outfile + '0.kct#bnum=24M#psiz=128k#pccap=512M', kc.DB.OWRITER | kc.DB.OCREATE)
+    lvl1.open(options.outfile + '1.kct#bnum=24M#psiz=128k#pccap=512M', kc.DB.OWRITER | kc.DB.OCREATE)
+    lvl2.open(options.outfile + '2.kct#bnum=24M#psiz=128k#pccap=512M', kc.DB.OWRITER | kc.DB.OCREATE)
     
     
     infile = open(options.infile, 'r')

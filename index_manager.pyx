@@ -17,27 +17,31 @@ class IndexManager(object):
         self.config = config
         self.update_only_one = self.config.getboolean("index_manager", "update_only_one")
         self.index_class = eval(self.config.get("index", "type"))
-        self.logger.debug("using index types of class" + str(self.index_class))
-        path = os.path.abspath(self.config.get("database", "path"))        
+        self.logger.debug("using index types of class" + str(self.index_class))       
         self.naturals = self.config.get("database", "naturals")
         #indexes contains duplicates!
         self.indexes = dict()
         self.logger.debug("building indexes") 
         #a list of all indexes  
         self.unique_indexes = []
-        self.build_indexes(path)
+        self.build_indexes()
         
     
     '''here we instanciate one index class for every permutation of the naturals string
     we also add a (tuple as) key for every sub-tuple (eg. s,  and s,p and s,p,o  for s,p,o,c) with the index
     as value. they go into unique_indexes and indexes
     ''' 
-    def build_indexes(self, path):        
-        for p in permutations(self.naturals):           
+    def build_indexes(self):
+        #build a list of tuples all permutations of e.g. 'spo' -> ('s','p','o), ('s','o','p')  etc.     
+        for p in permutations(self.naturals):
+            #the name (in the index known as internal_ordering). e.g. ('s','o','p') -> "sop"           
             index_name = "".join(p)                          
-            #instanciate a new index. equal to ie: an_index = KVIndexTC(config_instance, name="spo")
-            an_index = self.index_class(self.config, name=index_name)             
-            self.unique_indexes.append(an_index)
+            #instanciate a new index. equal to e.g.: an_index = KVIndexTC(config_instance, name="spo")
+            an_index = self.index_class(self.config, name=index_name) 
+            #maintain a list of all indexes in unique_indexes            
+            self.unique_indexes.append(an_index) 
+            #generate the keys for the mapping dict self.indexes and set the index as value
+            #e.g. for 'spo'  -> ('s',), ('s','p'), ('s','p','o') as keys
             for i in range(1,len(p)+1):
                 self.indexes[p[0:i]] = an_index                
         #for (None), (None,None,...) set any index 
@@ -46,7 +50,7 @@ class IndexManager(object):
             #if we have no given vars it does not matter which index we take     
             self.indexes[none_tuple] = an_index        
                 
-    #from itertools in python 3.1.2
+    #backport from itertools in python 3.1.2
     def compress(self, data, selectors):
         # ("x", None, "y", None)  -> ("s", "o")
         #return (d for d, s in zip(data, selectors) if s)
@@ -62,7 +66,16 @@ class IndexManager(object):
     '''return the coresponding index for a tuple of a triple/quad'''
     def index_for_tuple(self, triple):
         return self.indexes[tuple(self.compress(self.naturals, triple))]    
-     
+
+    '''return the coresponding indexes for a tuple of a triple/quad'''
+    def indexes_for_tuple(self, triple):
+        #generator for all possible key combinations
+        naturals = self.compress(self.naturals, triple) 
+        #generator for all permutations
+        all_indexes = permutations(x for x in naturals)
+        #list of all 
+        return [ self.indexes[i] for i in all_indexes  ]     
+    
     #@memoized    
     def index_for_ttriple(self, ttriple, var):
         idx_name = tuple(i for i in self.compress(self.naturals, ttriple.ids_as_tuple()))
@@ -92,8 +105,11 @@ class IndexManager(object):
         return self.index_for_ttriple(ttriple,var).ids_for_triple(ttriple.ids_as_tuple(), searched_natural=snatural)
                 
     def close(self):
-        for idx in self.unique_indexes:
-            idx.close()
+        if self.update_only_one:
+            self.unique_indexes[0].close()
+        else: 
+            for idx in self.unique_indexes:
+                idx.close() 
     
     def __len__(self):
         return len(self.unique_indexes[0])                                           

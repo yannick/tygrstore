@@ -8,67 +8,7 @@ import logging
 import cysparql as sparql
 import binascii 
 from helpers import *
-class BGP(object):
-      def __init__(self, context=None, optional=False):
-          self.optional = optional
-          self.context = context
-          self.triples = []
-          
-      
-class ResultSet(object):
-    def __init__(self,variables, triples):
-        self.triples = triples
-        self.variables = list(variables)
-        self.unsolved_variables = list(variables)
-        self.solutions = dict((var,None) for var in variables)     
-        
-    def triples_with_var(self,var):
-        return [triple for triple in self.triples if (triple.unsolved_variables.count(var) > 0 )]
-                             
-    '''set the variable as resolved'''
-    def resolve(self, var, solution):
-        #import pdb; pdb.set_trace()
-        for triple in self.triples:
-            triple.resolve(var, solution)
-        #try:
-        self.unsolved_variables.remove(var)
-        #except ValueError:
-        #    pass #just setting a new value
-        self.solutions[var] = solution   
-    
-    def unresolve(self, var):
-        for triple in self.triples:
-            triple.unresolve(var)
-        self.unsolved_variables.append(var)        
-        self.solutions[var] = None
-            
-    def __str__(self):
-        return "ResultSet with unsolved: %s and %s triples" % (str(self.unsolved_variables), len(self.triples))
-           
-class Triple(object):
-    def __init__(self,cysparql_triple):
-        self.ids = list(cysparql_triple.as_id_tuple()) 
-        self.variables = list(cysparql_triple.variables)
-        self.variables_tuple = cysparql_triple.as_var_tuple()
-        self.n3 = cysparql_triple.n3(withvars=False)
-        self.unsolved_variables = list(self.variables)
-        self.selectivity = cysparql_triple.selectivity
-        
-    def __str__(self):
-        return "triple: " + str(self.n3) + " variables: " + str(self.variables)
-    
-    def resolve(self,var,solution):
-        if self.variables.count(var) > 0:         
-            self.ids[self.variables_tuple.index(var)] = solution
-            self.unsolved_variables.remove(var)
-    
-    def unresolve(self,var):
-        if self.variables.count(var) > 0:
-            self.unsolved_variables.append(var)
-            self.ids[self.variables_tuple.index(var)] = None   
-    
-    def ids_as_tuple(self):
-        return tuple(self.ids) 
+
                         
 class QueryEngine(object):
     
@@ -79,7 +19,10 @@ class QueryEngine(object):
         self.logger = logging.getLogger("tygrstore.query_engine")
         self.config = config_file 
         self.jump_btree = self.config.getboolean("index", "jump_btree")
-    
+        
+        self.stats = TStats()
+        
+        
     def execute(self, query):
         #parse the query
         self.sparql_query = sparql.Query(query)
@@ -97,7 +40,8 @@ class QueryEngine(object):
             triple.encode(ids[0],ids[1],ids[2], numeric=eval(self.config.get("general", "numeric_ids"))) 
             
             #get selectivity 
-            sel = self.index_manager.selectivity_for_tuple(ids)            
+            sel = self.index_manager.selectivity_for_tuple(ids) 
+            #sel = 2           
             triple.selectivity = sel
             self.logger.debug("got selectivity of %s for tuple %s" % (sel,triple.n3(withvars=True)))
                  
@@ -110,11 +54,11 @@ class QueryEngine(object):
         
         #generate an empty result set
         empty_result_set = ResultSet([var.name for var in self.sparql_query.vars], triples)   
-            
+        #empty_result_set = ResultSet( triples)     
                 
         #import pdb; pdb.set_trace() 
         #get the first variable we want to solve
-        firstvar = empty_result_set.triples[0].variables[-1] 
+        firstvar = empty_result_set.get_most_selective_var() 
         
         #for debugging 
         self.recursionsteps = 0
@@ -128,9 +72,11 @@ class QueryEngine(object):
                 
     '''the recursively called evaluate function'''    
     def evaluate(self, result_set, var):
-        #if (var != self.checkvar): 
-        #    self.logger.debug("solving variable: " + var)
-        #    self.checkvar = var
+        # if (var != self.checkvar): 
+        #     self.logger.debug("solving variable: " + var)
+        #     self.checkvar = var    
+        self.stats.increment("calls_to_evaluate_by_var." + var, 1)
+ 
          
         #TODO: check if only 1 triple in BGP
         
@@ -183,7 +129,8 @@ class QueryEngine(object):
         if len(triples_with_var) == 1:            
             return self.index_manager.ids_for_ttriple(triples_with_var[0], var)
         for triple in triples_with_var:                                                
-            id_generators.append(self.index_manager.ids_for_ttriple(triple, var))
+            id_generators.append(self.index_manager.ids_for_ttriple(triple, var)) 
+        #self.logger.debug( "joining %s generators" % len(id_generators))
         return self.multi_merge_join(id_generators)
     
     
@@ -226,6 +173,7 @@ class QueryEngine(object):
         right = right_generator.next()                               
         while left_generator and right_generator:
             comparison = cmp(right, left)
+            #print " left: %s     right: %s " %  ( binascii.hexlify(left), binascii.hexlify(right) )
             if comparison == 0:                
                 yield left
                 left = left_generator.next()

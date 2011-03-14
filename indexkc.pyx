@@ -96,7 +96,7 @@ class KVIndexKC(KVIndex):
             return self.levels[len(triple_without_none)-1].increment( "".join(triple_without_none),0)            
                             
                           
-    def ids_for_triple(self,triple, num_records=-1):
+    def ids_for_triple(self,triple, num_records=-1, searched_natural=""):
         #sid,pid,oid = triple
         triple_without_none = filter(lambda x: x != None, triple) 
         left_offset = len(triple_without_none) * self.keylength
@@ -107,7 +107,6 @@ class KVIndexKC(KVIndex):
         
 
     def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=16, num_records=0):
-        #print searchstring
         cur = self.levels[-1].cursor() 
         cur.jump(searchstring)        
         while 1:
@@ -118,8 +117,6 @@ class KVIndexKC(KVIndex):
                     if jumpto:
                         cur.jump("".join((searchstring, jumpto)))                 
                 else:  
-                    #
-                    # self.logger.debug("generator exhausted")
                     raise StopIteration                                           
             except KeyError:
                 self.logger.error("key error for: %s" % str(searchstring)) 
