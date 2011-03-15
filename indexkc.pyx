@@ -1,3 +1,4 @@
+# cython: profile=True
 import os                         
 import kyotocabinet as kc 
 import binascii
@@ -108,11 +109,11 @@ class KVIndexKC(KVIndex):
 
     def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=16, num_records=0):
         cur = self.levels[-1].cursor() 
-        cur.jump(searchstring)        
-        while 1:
+        cur.jump(searchstring)                
+        while True:
             try:
                 next = cur.next()
-                if next[0:loffset] == (searchstring):
+                if next[:loffset] == (searchstring):
                     jumpto = yield(next[loffset:roffset])
                     if jumpto:
                         cur.jump("".join((searchstring, jumpto)))                 

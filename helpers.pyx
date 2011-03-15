@@ -1,6 +1,7 @@
 import binascii as ba
 import functools
 import logging 
+from operator import itemgetter, attrgetter
 
 class BGP(object):
       def __init__(self, context=None, optional=False):
@@ -17,17 +18,31 @@ class ResultSet(object):
         self.solutions = dict((var,None) for var in variables)     
         self.logger = logging.getLogger("tygrstore.result_set") 
         
+        #OMG please ignore this
+        # for triple in self.triples:
+        #     for varname in triple.variables_tuple:
+        #         for varobj in self.unsolved_variables:
+        #             if varobj.selectivity > triple.selectivity or varobj.selectivity < 0:
+        #                 varobj.selectivity = triple.selectivity  
+                        
         #sort the unresolved variables
-        self.unsolved_variables
+        #sorted( self.unsolved_variables, key=attrgetter("selectivity"), reverse=True)
         
     def triples_with_var(self,var):
         return [triple for triple in self.triples if (triple.unsolved_variables.count(var) > 0 )] 
-        
+    
+    def unsolved_triples(self):
+        for t in self.triples:
+            if len(t.unsolved_variables) > 0:
+                yield t
+            
     def get_most_selective_var(self): 
-        least_selective_triple = min(self.triples, key = lambda x: x.selectivity )
-        self.logger.debug("found least selective triple " + str(least_selective_triple.n3) + " with variables: " + str(least_selective_triple.variables_tuple)  )
-        if len(least_selective_triple.variables_tuple) == 1:
-            return least_selective_triple.variables_tuple[0]
+        least_selective_triple = min(self.unsolved_triples(), key = lambda x: x.selectivity )
+        #self.logger.debug("found least selective triple " + str(least_selective_triple.n3) + " with variables: " + str(least_selective_triple.variables_tuple)  ) 
+        #import pdb; pdb.set_trace() 
+        if len(least_selective_triple.unsolved_variables) == 1:
+            #self.logger.debug("one var:: " + least_selective_triple.variables_tuple[0])
+            return least_selective_triple.unsolved_variables[0]
         else:
            #get the var with the most triples!
            var_with_min_triple = min( least_selective_triple.variables_tuple, key = lambda y:  len([1 for x in self.triples if y in x.variables_tuple]) )
@@ -38,7 +53,13 @@ class ResultSet(object):
     def resolve(self, var, solution):
         #import pdb; pdb.set_trace()
         for triple in self.triples:
-            triple.resolve(var, solution)
+            if var in triple.unsolved_variables:            
+                triple.resolve(var, solution)
+                #explore this path 
+                # import pdb; pdb.set_trace()
+                #                 for var2 in triple.unsolved_variables: 
+                #                     #move the var to the end of the list to be solved next!
+                #                     self.unsolved_variables.append( self.unsolved_variables.pop(self.unsolved_variables.index(var2)))                               
         #try:
         self.unsolved_variables.remove(var)
         #except ValueError:
@@ -62,19 +83,26 @@ class Triple(object):
         self.n3 = cysparql_triple.n3(withvars=False)
         self.unsolved_variables = list(self.variables)
         self.selectivity = cysparql_triple.selectivity
+        self.updated = False
         
     def __str__(self):
         return "triple: " + str(self.n3) + " variables: " + str(self.variables)
     
+    def update_selectivity(self, new_sel):
+        self.updated = False
+        self.selectivity = new_sel
+        
     def resolve(self,var,solution):
         if self.variables.count(var) > 0:         
-            self.ids[self.variables_tuple.index(var)] = solution
+            self.ids[self.variables_tuple.index(var)] = solution            
             self.unsolved_variables.remove(var)
+            self.updated = True
     
     def unresolve(self,var):
         if self.variables.count(var) > 0:
             self.unsolved_variables.append(var)
-            self.ids[self.variables_tuple.index(var)] = None   
+            self.ids[self.variables_tuple.index(var)] = None 
+            self.updated = True  
     
     def ids_as_tuple(self):
         return tuple(self.ids)

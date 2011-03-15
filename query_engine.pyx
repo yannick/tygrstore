@@ -58,46 +58,58 @@ class QueryEngine(object):
                 
         #import pdb; pdb.set_trace() 
         #get the first variable we want to solve
+         
         firstvar = empty_result_set.get_most_selective_var() 
         
         #for debugging 
         self.recursionsteps = 0
         self.checkvar = ""
         self.logger.debug("got the following variables: %s and using %s as the first" % (str(empty_result_set.unsolved_variables),firstvar))  
-
+        self.t0 = time.time()
         #generator which yields the actual results as hash 
-        for res in self.evaluate(empty_result_set, firstvar):             
-            yield (self.id2s_hash(res), self.recursionsteps)  
+        for res in self.evaluate(empty_result_set, firstvar):                         
+            yield (self.id2s_hash(res), self.recursionsteps)              
         
                 
     '''the recursively called evaluate function'''    
     def evaluate(self, result_set, var):
+        
         # if (var != self.checkvar): 
-        #     self.logger.debug("solving variable: " + var)
-        #     self.checkvar = var    
+        #     self.logger.debug( str(time.time() - self.t0) + "solving variable: " + var)
+        #     self.checkvar = var     
         self.stats.increment("calls_to_evaluate_by_var." + var, 1)
- 
          
         #TODO: check if only 1 triple in BGP
         
         #we need only the triples which contain the unbound variable we search  
         triples_with_var = result_set.triples_with_var(var) 
-      
+        #self.logger.debug( str(time.time() - self.t0) + "got triples_with_var for " + var)
         #we then join all the resulting id's                                                        
         for an_id in self.mergejoin_ids(triples_with_var, var):                                                                                                             
-            #set the var as solved                                                                  
+            #set the var as solved  
+            #self.logger.debug( str(time.time() - self.t0) + "next id for: " + var)                                                                
             result_set.resolve(var, an_id) 
             next_var = None                                                                    
+             
             
+            for ttriple in result_set.triples:
+                if ttriple.updated:
+                    ttriple.update_selectivity(
+                        self.index_manager.selectivity_for_tuple(ttriple.ids_as_tuple()) 
+                        )  
+            #self.logger.debug( str(time.time() - self.t0) + "updated selectivities")        
             #if we have unsolved variables go a recursion step deeper, otherwise yield a result
             if len(result_set.unsolved_variables) > 0:                                                        
-                next_var =  result_set.unsolved_variables[-1]                                                  
+                next_var =  result_set.get_most_selective_var()                                                  
                 
                 #recursive call!
                 for res in self.evaluate(result_set, next_var):                                    
                     yield res                                                                    
                 #unset the just solved var                                                              
-                result_set.unresolve(var)
+                result_set.unresolve(var) 
+                #self.logger.debug("unsert: " + str(var))
+                #if var == 'student':
+                #    import pdb; pdb.set_trace()
             else:
                 #we found a result                
                 yield result_set.solutions
@@ -129,7 +141,7 @@ class QueryEngine(object):
         if len(triples_with_var) == 1:            
             return self.index_manager.ids_for_ttriple(triples_with_var[0], var)
         for triple in triples_with_var:                                                
-            id_generators.append(self.index_manager.ids_for_ttriple(triple, var)) 
+            id_generators.insert(0,self.index_manager.ids_for_ttriple(triple, var)) 
         #self.logger.debug( "joining %s generators" % len(id_generators))
         return self.multi_merge_join(id_generators)
     
