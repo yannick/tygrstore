@@ -107,17 +107,23 @@ class KVIndexKC(KVIndex):
 #generators    
         
 
-    def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=16, num_records=0):
-        cur = self.levels[-1].cursor() 
+    def generator_for_searchstring_with_jump(self,searchstring,loffset=0,roffset=16, num_records=0):  
+        #select the deepest level 
+        cur = self.levels[-1].cursor()
+        #jump to the lowest possible key 
         cur.jump(searchstring)                
         while True:
             try:
-                next = cur.next()
-                if next[:loffset] == (searchstring):
-                    jumpto = yield(next[loffset:roffset])
-                    if jumpto:
+                next = cur.next() 
+                #check if we are still within the correct keyspace
+                if next[:loffset] == (searchstring):   
+                    #yield the key and receive the next possible lowest key (jumpto)
+                    jumpto = yield(next[loffset:roffset])                   
+                    if jumpto:   
+                        #advance the cursor
                         cur.jump("".join((searchstring, jumpto)))                 
-                else:  
+                else:
+                    #keyspace is exhausted  
                     raise StopIteration                                           
             except KeyError:
                 self.logger.error("key error for: %s" % str(searchstring)) 

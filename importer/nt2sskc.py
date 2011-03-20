@@ -37,8 +37,8 @@ def process(options):
     cache = {}
     for line in sys.stdin:
         cnt +=1
-        if (cnt % 3000000) == 0:
-            tkps = 3000000/(time.time() - tmp)
+        if (cnt % options.cache) == 0:
+            tkps =  options.cache/(time.time() - tmp)
             kps = cnt/(time.time() - st) 
             now = time.time() - st   
             est = (totalkeys - cnt)/tkps
@@ -50,7 +50,7 @@ def process(options):
                 db.set(k,v)
             endt = time.time() - sti
             cache = {}
-            print "inserting into tree took %f seconds, that is %f ktps" % (endt, 3000000/endt)
+            print "inserting into tree took %f seconds, that is %f ktps" % (endt,  options.cache/endt)
         (s,p,o) = triplematch.findall(line)[0]
         #collection.insert( { "s":Binary(hl.md5(trip[0]).digest),"p":Binary(hl.md5(trip[1]).digest),"o":Binary(hl.md5(trip[2]).digest) } )
         cache[hl.md5(s).digest()] = s
@@ -81,7 +81,10 @@ def main():
     parser.add_option('-t','--totalkeys', type='int',
                     action='store', dest='totalkeys', default=138318414,
                     help='how many triples')                                         
-       
+    parser.add_option('-c','--cachesize', type='int',
+                    action='store', dest='cache', default=138318414,
+                    help='how many triples are cached')  
+                                      
     (options, args) = parser.parse_args()
 
     t0      = time.time()

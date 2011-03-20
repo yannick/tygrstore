@@ -67,7 +67,8 @@ class IndexManager(object):
     def index_for_tuple(self, triple):
         return self.indexes[tuple(self.compress(self.naturals, triple))]    
 
-    '''return the coresponding indexes for a tuple of a triple/quad'''
+    '''return the coresponding indexes for a tuple of a triple/quad''' 
+    @memoized
     def indexes_for_tuple(self, triple):
         #generator for all possible key combinations
         naturals = self.compress(self.naturals, triple) 
@@ -76,10 +77,13 @@ class IndexManager(object):
         #list of all 
         return [ self.indexes[i] for i in all_indexes  ]     
     
-    #@memoized    
+    @memoized    
     def index_for_ttriple(self, ttriple, var):
-        idx_name = tuple(i for i in self.compress(self.naturals, ttriple.ids_as_tuple()))
-        idx_name += (self.naturals[ttriple.variables_tuple.index(var)],)
+        #get all solved naturals in the triple. 
+        idx_name = tuple(i for i in self.compress(self.naturals, ttriple.ids_as_tuple())) 
+        # add the natural where the variable we are searching for is
+        idx_name += (self.naturals[ttriple.variables_tuple.index(var)],) 
+        #look the index up in the dict
         return self.indexes[idx_name]    
  
     '''index needs to support .count'''

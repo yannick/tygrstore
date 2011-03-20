@@ -8,7 +8,7 @@ import logging
 import cysparql as sparql
 import binascii 
 from helpers import *
-
+import stopwatch
                         
 class QueryEngine(object):
     
@@ -22,13 +22,16 @@ class QueryEngine(object):
         
         self.stats = TStats()
         
-        
+    def reload_sparql(self):
+        reload(sparql)
+    
     def execute(self, query):
         #parse the query
         self.sparql_query = sparql.Query(query)
                
         triples = []    
         
+        setup_time = stopwatch.Timer()
         #TODO: set together the different graph patterns and execute their code in paralell
         current_gp = self.sparql_query.graph_pattern                                       
         
@@ -66,7 +69,8 @@ class QueryEngine(object):
         self.checkvar = ""
         self.logger.debug("got the following variables: %s and using %s as the first" % (str(empty_result_set.unsolved_variables),firstvar))  
         self.t0 = time.time()
-        #generator which yields the actual results as hash 
+        #generator which yields the actual results as hash
+        self.stats.stats["qe_setup_time"] = setup_time.elapsed         
         for res in self.evaluate(empty_result_set, firstvar):                         
             yield (self.id2s_hash(res), self.recursionsteps)              
         
@@ -185,7 +189,7 @@ class QueryEngine(object):
         right = right_generator.next()                               
         while left_generator and right_generator:
             comparison = cmp(right, left)
-            #print " left: %s     right: %s " %  ( binascii.hexlify(left), binascii.hexlify(right) )
+            #self.logger.debug(" left: %s     right: %s " %  ( binascii.hexlify(left), binascii.hexlify(right) ) )
             if comparison == 0:                
                 yield left
                 left = left_generator.next()
