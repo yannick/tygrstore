@@ -1,3 +1,5 @@
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
 import kyotocabinet as kc
 import os
 from stringstore import Stringstore 

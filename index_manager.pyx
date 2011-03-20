@@ -1,3 +1,5 @@
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
 # cython: profile=True
 from index import *
 from indexkc import *

@@ -1,3 +1,6 @@
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
+
 import binascii as ba
 import functools
 import logging 

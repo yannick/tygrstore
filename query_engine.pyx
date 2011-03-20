@@ -1,4 +1,6 @@
-# cython: profile=True
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
+# # cython: profile=True
 from stringstore import *
 import stringstore
 import heapq

@@ -1,3 +1,5 @@
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
 import redis        
 class KVIndexRedis(KVIndex):
     def __init__(self, config, name="spo" ): 

@@ -3,6 +3,8 @@ import hashlib
 import binascii
 #from tc import *
 #import os 
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
 class Stringstore(object):       
         
     def __init__(self, config_file):          

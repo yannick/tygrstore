@@ -1,3 +1,5 @@
+__author__ = 'Yannick Koechlin'
+__email__ = 'yannick@koechlin.name'
 # cython: profile=True
 INDEX_OPEN = 42
 #todo: 
