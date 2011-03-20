@@ -1,5 +1,20 @@
 __author__ = 'Yannick Koechlin'
-__email__ = 'yannick@koechlin.name'
+__email__ = 'yannick@koechlin.name'          
+#     This file is part of Tygrstore.
+# 
+#     Tygrstore is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU Affero General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+# 
+#     Tygrstore is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU Affero General Public License for more details.
+# 
+#     You should have received a copy of the GNU Affero General Public License
+#     along with Tygrstore.  If not, see <http://www.gnu.org/licenses/>.
+# 
 # # cython: profile=True
 from stringstore import *
 import stringstore
