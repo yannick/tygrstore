@@ -75,8 +75,9 @@ class IndexManager(object):
         #generator for all permutations
         all_indexes = permutations(x for x in naturals)
         #list of all 
-        return [ self.indexes[i] for i in all_indexes  ]     
-    
+        return [ self.indexes[i] for i in all_indexes  ]  
+           
+    '''return the coresponding indexes for a tuple of a triple/quad''' 
     @memoized    
     def index_for_ttriple(self, ttriple, var):
         #get all solved naturals in the triple. 

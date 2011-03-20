@@ -9,7 +9,7 @@ class BGP(object):
           self.context = context
           self.triples = []
           
-      
+'''ResultSet represent one Solution to the Query'''      
 class ResultSet(object):
     def __init__(self,variables, triples):
         self.triples = triples
@@ -17,16 +17,7 @@ class ResultSet(object):
         self.unsolved_variables = list(variables)
         self.solutions = dict((var,None) for var in variables)     
         self.logger = logging.getLogger("tygrstore.result_set") 
-        
-        #OMG please ignore this
-        # for triple in self.triples:
-        #     for varname in triple.variables_tuple:
-        #         for varobj in self.unsolved_variables:
-        #             if varobj.selectivity > triple.selectivity or varobj.selectivity < 0:
-        #                 varobj.selectivity = triple.selectivity  
-                        
-        #sort the unresolved variables
-        #sorted( self.unsolved_variables, key=attrgetter("selectivity"), reverse=True)
+
         
     def triples_with_var(self,var):
         return [triple for triple in self.triples if (triple.unsolved_variables.count(var) > 0 )] 
@@ -56,14 +47,7 @@ class ResultSet(object):
             if var in triple.unsolved_variables:            
                 triple.resolve(var, solution)
                 #explore this path 
-                # import pdb; pdb.set_trace()
-                #                 for var2 in triple.unsolved_variables: 
-                #                     #move the var to the end of the list to be solved next!
-                #                     self.unsolved_variables.append( self.unsolved_variables.pop(self.unsolved_variables.index(var2)))                               
-        #try:
         self.unsolved_variables.remove(var)
-        #except ValueError:
-        #    pass #just setting a new value
         self.solutions[var] = solution   
     
     def unresolve(self, var):
