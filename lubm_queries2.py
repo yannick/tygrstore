@@ -4,7 +4,9 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
 """  
 
-queries["lq1"] = ''' 
+queries["lq1"] = '''  
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
 SELECT ?department WHERE 
 {
         ?researchGroups ub:subOrganizationOf ?department .
@@ -20,6 +22,8 @@ SELECT ?mail ?phone ?doctor WHERE
          }'''
 
 queries["lq3"] = '''
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
 SELECT ?studentName ?courseName WHERE {
      ?student ub:takesCourse ?course .
      ?course ub:name ?courseName .
